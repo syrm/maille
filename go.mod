@@ -20,6 +20,7 @@ require (
 )
 
 require (
+	github.com/bwmarrin/snowflake v0.3.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/samber/oops v1.21.0
 	go.opentelemetry.io/otel v1.29.0 // indirect

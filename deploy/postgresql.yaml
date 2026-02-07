@@ -20,23 +20,33 @@ spec:
               hostPort: 15542
           env:
             - name: POSTGRES_DB
-              value: "notbeancount"
+              value: "maille"
             - name: POSTGRES_USER
-              value: "notbeancount"
+              value: "maille"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: notbeancount-database
+                  name: maille-database
                   key: password
           args:
             - "postgres"
+            - "-c"
+            - "log_statement=all"
+            - "-c"
+            - "log_min_duration_statement=0"
+            - "-c"
+            - "synchronous_commit=off"
+            - "-c"
+            - "fsync=off"                     # ⚠️ DEV ONLY — risque de corruption si crash
+            - "-c"
+            - "full_page_writes=off"          # ⚠️ DEV ONLY — idem
             # --- Mémoire ---
             - "-c" 
             - "shared_buffers=512MB"
             - "-c"
-            - "work_mem=64MB"
+            - "work_mem=512MB"
             - "-c"
-            - "maintenance_work_mem=256MB"
+            - "maintenance_work_mem=512MB"
             - "-c"
             - "effective_cache_size=1536MB"
 
@@ -46,15 +56,15 @@ spec:
             - "-c"
             - "max_wal_senders=0"
             - "-c"
-            - "wal_buffers=64MB"
+            - "wal_buffers=256MB"
             - "-c"
             - "wal_writer_delay=200ms"
             - "-c"
             - "checkpoint_completion_target=0.9"
             - "-c"
-            - "max_wal_size=4GB"
+            - "max_wal_size=8GB"
             - "-c"
-            - "min_wal_size=1GB"
+            - "min_wal_size=2GB"
 
         # --- Durabilité relâchée (perf > safety) ---
             - "-c"
@@ -77,6 +87,14 @@ spec:
             - "commit_delay=100"
             - "-c"
             - "commit_siblings=5"
+            - "-c"
+            - "max_worker_processes=4"
+            - "-c"
+            - "max_parallel_workers_per_gather=2"
+            - "-c"
+            - "max_parallel_workers=4"
+            - "-c"
+            - "max_parallel_maintenance_workers=2"
 
         # --- Logging minimal ---
             - "-c"
@@ -87,10 +105,10 @@ spec:
           resources:
             limits:
               memory: "2Gi"
-              cpu: "2"
+              cpu: "4"
           requests:
-            memory: "1Gi"
-            cpu: "1"
+            memory: "2Gi"
+            cpu: "4"
           
           volumeMounts:
             - name: postgres-storage

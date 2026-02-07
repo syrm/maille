@@ -1,27 +1,37 @@
 package web
 
 import (
+	"context"
+	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/abiosoft/mold"
 	"github.com/go-chi/chi/v5"
-	"github.com/syrm/maille/internal/processor"
+	"github.com/syrm/maille/internal"
 )
 
-type Upload struct {
-	Processor processor.Processor
-	Parser    processor.OFXParser
-	Engine    mold.Engine
-	Logger    *slog.Logger
+type TransactionParser interface {
+	Parse(ctx context.Context, reader io.Reader, batchSize int, fn func(context.Context, string, []internal.Transaction) error) error
 }
 
-func (u Upload) GetRouter() *chi.Mux {
-	apiRouter := chi.NewRouter()
-	apiRouter.Get("/upload", u.Get)
-	apiRouter.Post("/upload", u.Post)
+type TransactionStore interface {
+	Process(ctx context.Context, currency string, stmts []internal.Transaction) error
+}
 
-	return apiRouter
+type Upload struct {
+	Parser TransactionParser
+	Store  TransactionStore
+	Engine mold.Engine
+	Logger *slog.Logger
+}
+
+func (u Upload) Router() *chi.Mux {
+	r := chi.NewRouter()
+	r.Get("/upload", u.Get)
+	r.Post("/upload", u.Post)
+
+	return r
 }
 
 func (u Upload) Get(w http.ResponseWriter, r *http.Request) {
@@ -59,22 +69,8 @@ func (u Upload) Post(w http.ResponseWriter, r *http.Request) {
 		return
 		// @TODO redirection
 	}
-	// defer file.Close()
 
-	// out, errCreate := os.CreateTemp(os.TempDir(), "upload-ofx-")
-	// defer os.Remove(out.Name())
-
-	// if errCreate != nil {
-	// 	u.Logger.ErrorContext(r.Context(), "failed to read file form", slog.Any("error", errForm))
-	// 	// @TODO redirection
-	// }
-
-	// io.Copy(out, file)
-
-	// mf, _ := os.Open(out.Name())
-
-	// reader := bufio.NewReaderSize(file, 64*1024)
-	errParse := u.Parser.Parse(r.Context(), file, 100_000, u.Processor.Process)
+	errParse := u.Parser.Parse(r.Context(), file, 200_000, u.Store.Process)
 
 	if errParse != nil {
 		u.Logger.ErrorContext(r.Context(), "failed to read all file", slog.Any("error", errParse))

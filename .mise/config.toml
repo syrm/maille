@@ -1,13 +1,13 @@
 [env]
-DATABASE_URL = "postgres://notbeancount:toto@localhost:15542/notbeancount"
+DATABASE_URL = "postgres://postgres:@localhost:5432/maille"
 
 [tasks.set-secret]
 usage = '''
 arg "<secret>" help="password of database/and pod database secret"
 '''
 run = '''#!/usr/bin/elvish
-  var a = (echo $E:usage_secret | base64 -w0); printf '{"password": "'$a'"}'"\n" | podman secret create --replace notbeancount-database -
-  var a = (printf 'postgres://notbeancount:'$E:usage_secret'@postgres:5432/notbeancount' | base64 -w0); printf '{"database": "'$a'"}'"\n" | podman secret create --replace notbeancount-database-url -
+  var a = (echo $E:usage_secret | base64 -w0); printf '{"password": "'$a'"}'"\n" | podman secret create --replace maille-database -
+  var a = (printf 'postgres://maille:'$E:usage_secret'@postgres:5432/maille' | base64 -w0); printf '{"database": "'$a'"}'"\n" | podman secret create --replace maille-database-url -
 '''
 
 [tasks.build]
