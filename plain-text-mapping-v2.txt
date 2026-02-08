@@ -1,0 +1,156 @@
+Assets:
+├── Bank
+│   ├── Checking                  (compte courant)
+│   └── Savings                   (Livret A, PEL…)
+Assets:
+├── Cash                          (retraits cash)
+├── Transfer                      (virements comptes à comptes)
+├── Deposits                      (dépôts cartes/chèques/espèces)
+├── Savings
+│   ├── Bank                      (Livret A, PEL…)
+│   └── Other                     (épargne autres)
+└── Investments
+    ├── Retirement                (retraite, prévoyance, PEA, assurance-vie)
+    ├── Stocks                    (placements boursiers)
+    └── RealEstate                (placements immobiliers)
+
+Liabilities:
+├── CreditCard                    (cartes débit différé, cartes crédit, crédit carte)
+└── Loans
+    ├── Car                       (financement auto/moto)
+    ├── Consumer                  (crédit conso)
+    ├── Student                   (prêt étudiant)
+    └── Other                     (emprunts autres)
+
+Equity:
+└── OpeningBalances               (balance initiale positive/négative)
+
+Income:
+├── Salary
+│   ├── Fixed                     (salaire fixe)
+│   ├── Variable                  (salaire variable)
+│   └── Other                     (revenus du travail autres)
+│
+├── Business
+│   ├── BIC                       (bénéfices industriels et commerciaux)
+│   ├── BNC                       (bénéfices non commerciaux)
+│   └── Agricultural              (revenus agricoles)
+│
+├── Benefits
+│   ├── Unemployment              (allocation chômage)
+│   ├── Family                    (allocations familiales)
+│   ├── Housing                   (allocations logements)
+│   ├── Education                 (allocations scolaires et bourses)
+│   ├── RSA                       (RSA)
+│   └── Other                     (allocations autres)
+│
+├── Pension
+│   ├── Retirement                (retraite)
+│   ├── RetirementSupp            (retraite complémentaire)
+│   ├── Alimony                   (pension alimentaire reçue)
+│   ├── Annuity                   (rente viagère)
+│   └── Other                     (invalidité, ancien combattants, réversion)
+│
+├── Investments
+│   ├── RealEstate                (revenus placements immobiliers)
+│   ├── Stocks                    (revenus placements boursiers)
+│   ├── Crypto                    (crypto monnaies)
+│   ├── BankSavings               (revenus épargne bancaire)
+│   ├── FinancialSavings          (revenus épargne financière)
+│   └── Other                     (revenus d'épargne autres)
+│
+├── Reimbursements
+│   ├── Health                    (remboursements frais de santé)
+│   ├── Business                  (remboursements frais professionnels)
+│   ├── Taxes                     (remboursement impôts)
+│   ├── Insurance                 (remboursements assurances)
+│   ├── Bank                      (remboursement frais / offres BoursoBank)
+│   └── Other                     (remboursements autres, vie quotidienne)
+│
+├── Other
+│   ├── Gambling                  (gains jeux et paris)
+│   ├── Inheritance               (héritages et dons reçus)
+│   └── Sales                     (vente d'équipements)
+│
+└── Transfers                     (virements reçus externes)
+
+Expenses:
+├── Housing
+│   ├── Rent                      (loyers, charges)
+│   ├── Mortgage                  (emprunt immobilier)
+│   ├── Utilities                 (eau, électricité, gaz, fuel, chauffage)
+│   ├── Insurance                 (assurance habitation et RC)
+│   ├── Maintenance               (travaux, réparations, entretien, nettoyage, déménagements)
+│   └── Other                     (logement autres)
+│
+├── Subscriptions
+│   ├── Telecom                   (internet, TV, téléphonie fixe et mobile)
+│   ├── Media                     (journaux, magazines, streaming)
+│   └── Other                     (abonnements autres)
+│
+├── Food
+│   ├── Groceries                 (alimentation, courses)
+│   └── DiningOut                 (restaurants, bars, discothèques)
+│
+├── Transport
+│   ├── PublicTransit             (métro, bus, transports quotidiens)
+│   └── Taxi                      (taxis, VTC)
+│
+├── Car
+│   ├── Fuel                      (carburant)
+│   ├── Insurance                 (assurance auto/moto)
+│   ├── Maintenance               (entretien, réparation)
+│   ├── Parking                   (parking)
+│   ├── Tolls                     (péages)
+│   ├── Fines                     (contraventions)
+│   └── Other                     (auto/moto autres)
+│
+├── Travel
+│   ├── Transport                 (avions, trains longue distance)
+│   ├── Accommodation             (hôtels, camping, Airbnb)
+│   └── Other                     (agences de voyages, location véhicules)
+│
+├── Health
+│   ├── Medical                   (médecins, frais médicaux)
+│   ├── Pharmacy                  (pharmacie, laboratoire)
+│   ├── Insurance                 (mutuelle, complémentaires santé)
+│   ├── Vision                    (optique, audition)
+│   └── Other                     (santé autres)
+│
+├── Shopping
+│   ├── Clothing                  (vêtements, accessoires)
+│   ├── Electronics               (électronique, informatique)
+│   ├── Home                      (mobilier, électroménager, déco, bricolage, jardinage)
+│   └── Other                     (livres, CD/DVD, bijoux, jouets)
+│
+├── Leisure
+│   ├── Entertainment             (ciné, théâtre, concerts, culture)
+│   ├── Sports                    (clubs, associations, équipements sportifs)
+│   ├── Hobbies                   (loisirs autres)
+│   └── Gambling                  (jeux et paris dépenses)
+│
+├── Personal
+│   ├── Beauty                    (coiffeur, soins, parfums, laverie, pressing)
+│   ├── Tobacco                   (tabac)
+│   └── Pets                      (animaux domestiques)
+│
+├── Family
+│   ├── Childcare                 (crèche, nounou, babysitter)
+│   ├── Education                 (études, formation, fournitures, cantine)
+│   ├── Allowance                 (argent de poche)
+│   ├── Alimony                   (pensions versées, financement personnes dépendantes)
+│   └── Other                     (famille autres)
+│
+├── Gifts                         (dons, cadeaux, solidarité)
+│
+├── Taxes
+│   ├── Income                    (impôt sur le revenu)
+│   ├── Property                  (taxe foncière, taxe habitation)
+│   └── Other                     (CSG-CRDS, IFI, Urssaf, charges patronales, autres)
+│
+├── Financial
+│   ├── BankFees                  (frais bancaires, agios, transferts étranger)
+│   ├── Services                  (avocats, notaires, comptabilité)
+│   └── Other                     (services financiers autres)
+│
+└── Other                         (autres dépenses, chèques, virements émis, hors catégorie)

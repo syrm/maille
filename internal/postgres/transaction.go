@@ -11,29 +11,94 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
 	"github.com/syrm/maille/internal"
+	"github.com/syrm/maille/internal/ofx"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var mappingAccount = map[string]string{
 	"123456789": "FR:BNP:Checking",
 }
 
-type Store struct {
-	Pool *pgxpool.Pool
+type Transaction struct {
+	pool   *pgxpool.Pool
+	tracer trace.Tracer
 }
 
-var (
-	countID    = 0
-	insert1    = 0
-	insert2    = 0
-	totalQuery = 0
-)
+func BuildTransaction(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) (*Transaction, error) {
+	return &Transaction{
+		pool:   pool,
+		tracer: tracer,
+	}, nil
+}
 
-func (s *Store) Process(ctx context.Context, currency string, stmts []internal.Transaction) error {
-	sTQ := time.Now()
-	rowCurrency := s.Pool.QueryRow(ctx, `SELECT id FROM currency WHERE name = $1`, currency)
-	// entropy := rand.New(rand.NewSource(time.Now().UnixNano()))
-	// ms := ulid.Timestamp(time.Now())
-	//
+func (s *Transaction) GetTransactions(ctx context.Context) ([]internal.Transaction, error) {
+	ctx, span := s.tracer.Start(ctx, "GetTransactions")
+	defer span.End()
+
+	rows, errQuery := s.pool.Query(
+		context.WithValue(ctx, SQLName, "get transactions"),
+		`SELECT transaction.id, date, payee, narration, account, amount
+		FROM transaction
+		INNER JOIN posting ON (posting.transaction_id = transaction.id)
+		ORDER BY transaction.id
+		`,
+	)
+
+	if errQuery != nil {
+		return []internal.Transaction{}, oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get transactions")
+	}
+	defer rows.Close()
+
+	var transactions []internal.Transaction
+
+	transaction := internal.Transaction{}
+	postings := []internal.Posting{}
+	lastID := 0
+	for rows.Next() {
+		var id int
+		var date time.Time
+		var payee string
+		var narration *string
+		var account string
+		var amount float64
+
+		rows.Scan(&id, &date, &payee, &narration, &account, &amount)
+
+		if lastID != 0 && lastID != id {
+			transaction.Postings = postings
+			transactions = append(transactions, transaction)
+
+			transaction = internal.Transaction{}
+			postings = []internal.Posting{}
+		}
+
+		transaction.ID = uint64(id)
+		transaction.Date = date
+		transaction.Payee = payee
+		transaction.Narration = narration
+		posting := internal.Posting{
+			Account: account,
+			Amount:  amount,
+		}
+		postings = append(postings, posting)
+		lastID = id
+	}
+
+	if err := rows.Err(); err != nil {
+		return transactions, fmt.Errorf("rows iteration: %w", err)
+	}
+
+	return transactions, nil
+}
+
+func (s *Transaction) Process(ctx context.Context, currency string, stmts []ofx.Transaction) error {
+	ctx, span := s.tracer.Start(ctx, "Process")
+	defer span.End()
+
+	rowCurrency := s.pool.QueryRow(context.WithValue(ctx, SQLName, "get currency"), `SELECT id FROM currency WHERE name = $1`, currency)
 	node, _ := snowflake.NewNode(1)
 
 	var currencyID uint32
@@ -57,19 +122,11 @@ func (s *Store) Process(ctx context.Context, currency string, stmts []internal.T
 				Errorf("account not found")
 		}
 
-		sID := time.Now()
-		id := node.Generate()
-		id2 := node.Generate()
-		id3 := node.Generate()
+		transactionID := node.Generate()
+		positionID1 := node.Generate()
+		positionID2 := node.Generate()
 
-		// id, _ := ulid.New(ms, entropy)
-		// id2, _ := ulid.New(ms, entropy)
-		// id3, _ := ulid.New(ms, entropy)
-		// id := bid.New()
-		// id2 := bid.New()
-		// id3 := bid.New()
-		countID += int(time.Since(sID).Milliseconds())
-
+		// Build date.
 		var sb strings.Builder
 		sb.Grow(10)
 		sb.WriteString(stmt.DatePosted[0:4])
@@ -77,102 +134,147 @@ func (s *Store) Process(ctx context.Context, currency string, stmts []internal.T
 		sb.WriteString(stmt.DatePosted[4:6])
 		sb.WriteByte('-')
 		sb.WriteString(stmt.DatePosted[6:8])
-		rows = append(rows, []any{id, sb.String(), true, stmt.Name, stmt.ID})
-		rowsPos = append(rowsPos, []any{id2, id, "ASSETS", mappingAccount[stmt.Account], stmt.TrnAmount, currencyID})
+
+		rows = append(rows, []any{transactionID, sb.String(), true, stmt.Name, stmt.ID})
+		rowsPos = append(
+			rowsPos,
+			[]any{
+				positionID1,
+				transactionID,
+				"ASSETS",
+				mappingAccount[stmt.Account],
+				stmt.TrnAmount,
+				currencyID,
+			},
+		)
 		if stmt.TrnType == "CREDIT" {
-			rowsPos = append(rowsPos, []any{id3, id, "INCOME", "Others", -1 * stmt.TrnAmount, currencyID})
+			rowsPos = append(rowsPos, []any{positionID2, transactionID, "INCOME", "Others", -1 * stmt.TrnAmount, currencyID})
 		} else {
-			rowsPos = append(rowsPos, []any{id3, id, "EXPENSES", "Others", -1 * stmt.TrnAmount, currencyID})
+			rowsPos = append(rowsPos, []any{positionID2, transactionID, "EXPENSES", "Others", -1 * stmt.TrnAmount, currencyID})
 		}
 	}
 
-	tx, _ := s.Pool.Begin(ctx)
-	defer tx.Rollback(ctx)
-	tx.Exec(ctx, "ALTER TABLE posting DROP CONSTRAINT posting_currency_id_fkey")
-	tx.Exec(ctx, "ALTER TABLE posting DROP CONSTRAINT posting_origin_position_id_fkey")
-	tx.Exec(ctx, "ALTER TABLE posting DROP CONSTRAINT posting_price_currency_id_fkey")
-	_, err4 := tx.Exec(ctx, "ALTER TABLE posting DROP CONSTRAINT posting_transaction_id_fkey")
-	if err4 != nil {
+	tx, errBegin := s.pool.Begin(context.WithValue(ctx, SQLName, "begin transaction"))
+
+	if errBegin != nil {
 		return oops.
 			In("Store").
 			WithContext(ctx).
-			Wrapf(err4, "failed to drop constraint")
+			Wrapf(errBegin, "failed to begin transaction")
 	}
 
-	sCopy1 := time.Now()
-	// _, err := s.Pool.CopyFrom(
-	_, err := tx.CopyFrom(
-		ctx,
+	defer tx.Rollback(context.WithValue(ctx, SQLName, "rollback transaction"))
+
+	_, errDrop1 := tx.Exec(
+		context.WithValue(ctx, SQLName, "drop constraint currency_id"),
+		"ALTER TABLE posting DROP CONSTRAINT posting_currency_id_fkey",
+	)
+	if errDrop1 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errDrop1, "failed to exec drop constraint currency_id")
+	}
+
+	_, errDrop2 := tx.Exec(
+		context.WithValue(ctx, SQLName, "drop constraint origin_position_id"),
+		"ALTER TABLE posting DROP CONSTRAINT posting_origin_position_id_fkey",
+	)
+	if errDrop2 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errDrop2, "failed to exec drop constraint currency_id")
+	}
+
+	_, errDrop3 := tx.Exec(
+		context.WithValue(ctx, SQLName, "drop constraint price_currency_id"),
+		"ALTER TABLE posting DROP CONSTRAINT posting_price_currency_id_fkey",
+	)
+	if errDrop3 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errDrop3, "failed to exec drop constraint price_currency_id")
+	}
+
+	_, errDrop4 := tx.Exec(
+		context.WithValue(ctx, SQLName, "drop constraint transaction_id"),
+		"ALTER TABLE posting DROP CONSTRAINT posting_transaction_id_fkey",
+	)
+	if errDrop4 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errDrop4, "failed to drop constraint")
+	}
+
+	_, errCopyTr := tx.CopyFrom(
+		context.WithValue(ctx, SQLName, "copy transaction"),
 		pgx.Identifier{"transaction"},
 		[]string{"id", "date", "completed", "payee", "external_id"},
 		pgx.CopyFromRows(rows),
 	)
-	if err != nil {
+	if errCopyTr != nil {
 		return oops.
 			In("Store").
 			WithContext(ctx).
-			Wrapf(err, "failed to copy data")
+			Wrapf(errCopyTr, "failed to exec copy transaction")
 	}
-	insert1 += int(time.Since(sCopy1).Milliseconds())
-
-	sCopy2 := time.Now()
-	// _, err := s.Pool.CopyFrom(
-	_, err2 := tx.CopyFrom(
-		ctx,
+	_, errCopyPosting := tx.CopyFrom(
+		context.WithValue(ctx, SQLName, "copy posting"),
 		pgx.Identifier{"posting"},
 		[]string{"id", "transaction_id", "type", "account", "amount", "currency_id"},
 		pgx.CopyFromRows(rowsPos),
 	)
-	if err2 != nil {
+	if errCopyPosting != nil {
 		return oops.
 			In("Store").
 			WithContext(ctx).
-			Wrapf(err2, "failed to copy data")
-	}
-	insert2 += int(time.Since(sCopy2).Milliseconds())
-
-	fmt.Println("id timer ", countID, "ms")
-	fmt.Println("copy 1 timer ", insert1, "ms")
-	fmt.Println("copy 2 timer ", insert2, "ms")
-
-	_, errA1 := tx.Exec(ctx, "ALTER TABLE posting ADD CONSTRAINT posting_currency_id_fkey FOREIGN KEY (currency_id) REFERENCES currency(id)")
-	if errA1 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errA1, "failed to add constraint 1")
-	}
-	_, errA2 := tx.Exec(ctx, "ALTER TABLE posting ADD CONSTRAINT posting_origin_position_id_fkey FOREIGN KEY (origin_position_id) REFERENCES position(id)")
-	if errA2 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errA2, "failed to add constraint 2")
-	}
-	_, errA3 := tx.Exec(ctx, "ALTER TABLE posting ADD CONSTRAINT posting_price_currency_id_fkey FOREIGN KEY (price_currency_id) REFERENCES currency(id)")
-	if errA3 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errA3, "failed to add constraint 3")
-	}
-	_, errA4 := tx.Exec(ctx, "ALTER TABLE posting ADD CONSTRAINT posting_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transaction(id)")
-	if errA4 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errA4, "failed to add constraint 4")
+			Wrapf(errCopyPosting, "failed to exec copy posting")
 	}
 
-	errCmt := tx.Commit(ctx)
+	_, errAdd1 := tx.Exec(
+		context.WithValue(ctx, SQLName, "add constraint currency_id"),
+		`ALTER TABLE posting ADD CONSTRAINT posting_currency_id_fkey FOREIGN KEY (currency_id) REFERENCES currency(id)`,
+	)
+	if errAdd1 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errAdd1, "failed to add constraint currency_id")
+	}
+	_, errAdd2 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint origin_position_id"),
+		"ALTER TABLE posting ADD CONSTRAINT posting_origin_position_id_fkey FOREIGN KEY (origin_position_id) REFERENCES position(id)",
+	)
+	if errAdd2 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errAdd2, "failed to add constraint origin_position_id")
+	}
+	_, errAdd3 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint price_currency_id"), "ALTER TABLE posting ADD CONSTRAINT posting_price_currency_id_fkey FOREIGN KEY (price_currency_id) REFERENCES currency(id)")
+	if errAdd3 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errAdd3, "failed to add constraint currency_id")
+	}
+	_, errAdd4 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint transaction_id"), "ALTER TABLE posting ADD CONSTRAINT posting_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transaction(id)")
+	if errAdd4 != nil {
+		return oops.
+			In("Store").
+			WithContext(ctx).
+			Wrapf(errAdd4, "failed to add constraint transaction_id")
+	}
+
+	errCmt := tx.Commit(context.WithValue(ctx, SQLName, "commit transaction"))
 	if errCmt != nil {
 		return oops.
 			In("Store").
 			WithContext(ctx).
 			Wrapf(errCmt, "failed to commit data")
 	}
-	totalQuery += int(time.Since(sTQ).Milliseconds())
-	fmt.Println("total query timer ", totalQuery, "ms")
 
 	return nil
 }

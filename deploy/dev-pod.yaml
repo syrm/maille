@@ -12,6 +12,9 @@ spec:
       ports:
         - containerPort: 13000
           hostPort: 13000
+      envFrom:
+        - configMapRef:
+            name: config
       env:
         - name: DATABASE_URL
           valueFrom:
@@ -36,3 +39,10 @@ spec:
     - name: go-build-cache
       persistentVolumeClaim:
         claimName: go-build-cache
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+  TRACING_ENDPOINT: docker-monitoring-collector:4317
