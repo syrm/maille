@@ -8,9 +8,18 @@ import (
 
 	"github.com/abiosoft/mold"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/gops/agent"
 	"github.com/jackc/pgx/v5/pgxpool"
-	slogchi "github.com/samber/slog-chi"
+	"github.com/riandyrn/otelchi"
+	"github.com/samber/oops"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	sdkresource "go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/syrm/maille/internal/ofx"
 	"github.com/syrm/maille/internal/postgres"
@@ -24,20 +33,11 @@ func main() {
 		AddSource: true,
 	}))
 
-	// @TODO quid opentelemetry/tracing ?
-
 	if err := agent.Listen(agent.Options{}); err != nil {
 		logger.ErrorContext(ctx, "error creating gops agent", slog.Any("error", err))
 	}
 
-	pool, errPool := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
-	if errPool != nil {
-		logger.ErrorContext(ctx, "failed to connect to database", slog.Any("error", errPool))
-		os.Exit(1)
-	}
-	defer pool.Close()
-
-	err := run(ctx, os.Getenv, pool, logger)
+	err := run(ctx, os.Getenv, logger)
 	if err != nil {
 		logger.ErrorContext(ctx, "failed to start server", slog.Any("error", err))
 	}
@@ -46,7 +46,6 @@ func main() {
 func run(
 	ctx context.Context,
 	getenv func(string) string,
-	pool *pgxpool.Pool,
 	logger *slog.Logger,
 ) error {
 	engine, errMold := mold.New(web.TemplateFS)
@@ -55,16 +54,50 @@ func run(
 		os.Exit(1)
 	}
 
+	tracerProvider, res, err := BuildTracerProvider(getenv("TRACING_ENDPOINT"))
+	_ = res
+	if err != nil {
+		return oops.Wrapf(err, "error during initialization of tracerProvider")
+	}
+
+	defer func() {
+		if errShutdown := tracerProvider.Shutdown(context.Background()); errShutdown != nil {
+			slog.Error("Error shutting down tracer provider", slog.Any("error", errShutdown))
+		}
+	}()
+
+	cfg, err := pgxpool.ParseConfig(getenv("DATABASE_URL"))
+	if err != nil {
+		return oops.Wrapf(err, "failed to create connection pool")
+	}
+
+	cfg.ConnConfig.Tracer = postgres.SQLTracer{Tracer: tracerProvider.GetTracer("postgres")}
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	postgresTransaction, err := postgres.BuildTransaction(ctx, pool, tracerProvider.GetTracer("postgres-transaction"))
+	if err != nil {
+		return err
+	}
+
 	upload := web.Upload{
-		Parser: &ofx.Parser{},
-		Store:  &postgres.Store{Pool: pool},
-		Engine: engine,
-		Logger: logger,
+		Parser: ofx.Parser{
+			Tracer: tracerProvider.GetTracer("ofx"),
+		},
+		PostgresTransaction: *postgresTransaction,
+		Engine:              engine,
+		Tracer:              tracerProvider.GetTracer("maille-web"),
+		Logger:              logger,
 	}
 
 	r := chi.NewRouter()
-	// r.Use(maxBytesMiddleware(200 * 1024 * 1024))
-	r.Use(slogchi.New(logger))
+	r.Use(
+		otelchi.Middleware("maille", otelchi.WithChiRoutes(r)),
+	)
+	r.Use(middleware.Recoverer)
 	r.Mount("/", upload.Router())
 
 	if err := http.ListenAndServe(":13000", r); err != nil {
@@ -74,11 +107,83 @@ func run(
 	return nil
 }
 
-func maxBytesMiddleware(maxBytes int64) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-			next.ServeHTTP(w, r)
-		})
+type Provider struct {
+	otelResource *sdkresource.Resource
+	// metricExporter  *prometheus.Exporter
+	tracingEndpoint string
+	tracerProvider  *sdktrace.TracerProvider
+}
+
+func BuildTracerProvider(tracingEndpoint string) (Provider, *sdkresource.Resource, error) {
+	extraResources, err := sdkresource.New(
+		context.Background(),
+		sdkresource.WithContainer(),
+		sdkresource.WithHost(),
+		sdkresource.WithAttributes(
+			semconv.ServiceNameKey.String("web"),
+		),
+	)
+	if err != nil {
+		return Provider{}, extraResources, oops.Wrapf(err, "unable to create an otel resource")
 	}
+
+	resource, err := sdkresource.Merge(
+		sdkresource.Default(),
+		extraResources,
+	)
+	if err != nil {
+		return Provider{}, extraResources, oops.Wrapf(err, "unable to merge otel resource")
+	}
+
+	provider := Provider{
+		otelResource: resource,
+		// metricExporter:  metricExporter,
+		tracingEndpoint: tracingEndpoint,
+	}
+
+	tracerProvider, err := provider.getTracerProvider()
+	if err != nil {
+		return Provider{}, resource, oops.Wrapf(err, "unable to create tracer provider")
+	}
+
+	provider.tracerProvider = tracerProvider
+
+	return provider, resource, nil
+}
+
+func (p *Provider) getTracerProvider() (*sdktrace.TracerProvider, error) {
+	ctx := context.Background()
+
+	traceExporter, err := otlptracegrpc.New(
+		ctx,
+		otlptracegrpc.WithEndpoint(p.tracingEndpoint), // @TODO env variable
+		otlptracegrpc.WithInsecure(),
+	)
+	if err != nil {
+		return nil, oops.Wrapf(err, "error during creation of traceExporter")
+	}
+
+	tracer := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(traceExporter),
+		sdktrace.WithResource(p.otelResource),
+	)
+
+	// meter := sdkmetric.NewMeterProvider(
+	// 	sdkmetric.WithReader(p.metricExporter),
+	// )
+
+	otel.SetTracerProvider(tracer)
+	// otel.SetMeterProvider(meter)
+
+	// otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+
+	return tracer, nil
+}
+
+func (p *Provider) Shutdown(ctx context.Context) error {
+	return p.tracerProvider.Shutdown(ctx)
+}
+
+func (p *Provider) GetTracer(name string) trace.Tracer {
+	return p.tracerProvider.Tracer(name)
 }

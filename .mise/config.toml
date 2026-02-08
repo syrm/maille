@@ -1,5 +1,6 @@
 [env]
 DATABASE_URL = "postgres://postgres:@localhost:5432/maille"
+TRACING_ENDPOINT="docker-monitoring-collector.docker-monitoring_public:4317"
 
 [tasks.set-secret]
 usage = '''
@@ -20,7 +21,7 @@ run = "podman network create maille-network"
 run = "podman play kube --network maille-network --replace deploy/postgresql.yaml"
 
 [tasks.deploy-pod]
-run = "podman play kube --network maille-network --replace deploy/dev-pod.yaml"
+run = "podman play kube --network maille-network --network docker-monitoring_public --replace deploy/dev-pod.yaml"
 
 [tasks.deploy]
 depends = ["build", "deploy-network", "deploy-postgresql", "deploy-pod"]

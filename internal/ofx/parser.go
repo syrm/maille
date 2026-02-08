@@ -9,13 +9,15 @@ import (
 	"strings"
 
 	"github.com/samber/oops"
-	"github.com/syrm/maille/internal"
+	"go.opentelemetry.io/otel/trace"
 )
 
-type Parser struct{}
+type Parser struct{
+	Tracer trace.Tracer
+}
 
-func (p Parser) parseBlock(ctx context.Context, block string) (internal.Transaction, error) {
-	var trn internal.Transaction
+func (p Parser) parseBlock(ctx context.Context, block string) (Transaction, error) {
+	var trn Transaction
 	trn.Account = p.extractTag(block, "DTUSER")
 	trn.DatePosted = p.extractTag(block, "DTPOSTED")
 	trn.Name = p.extractTag(block, "NAME")
@@ -83,15 +85,18 @@ func (p *Parser) Parse(
 	ctx context.Context,
 	reader io.Reader,
 	batchSize int,
-	process func(context.Context, string, []internal.Transaction) error,
+	process func(context.Context, string, []Transaction) error,
 ) error {
+	ctx, span := p.Tracer.Start(ctx, "Parse")
+    defer span.End()
+    
 	currency := p.getCurrency(reader)
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 
 	scanner.Split(p.splitOnStmtTrn)
 
-	stmts := make([]internal.Transaction, 0, batchSize)
+	stmts := make([]Transaction, 0, batchSize)
 
 	for scanner.Scan() {
 		stmt, errParse := p.parseBlock(ctx, scanner.Text())
