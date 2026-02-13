@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
-	"github.com/syrm/maille/internal"
+	"github.com/syrm/maille/internal/domain"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -15,52 +15,54 @@ type Account struct {
 	tracer trace.Tracer
 }
 
-func BuildAccount(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) (*Transaction, error) {
-	return &Transaction{
+func BuildAccount(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) *Account {
+	return &Account{
 		pool:   pool,
 		tracer: tracer,
-	}, nil
+	}
 }
 
-func (s *Transaction) GetAll(ctx context.Context) ([]internal.Account, error) {
-	ctx, span := s.tracer.Start(ctx, "GetAll")
+func (a *Account) GetAll(ctx context.Context) ([]domain.Account, error) {
+	ctx, span := a.tracer.Start(ctx, "GetAll")
 	defer span.End()
 
-	rows, errQuery := s.pool.Query(
+	rows, errQuery := a.pool.Query(
 		context.WithValue(ctx, SQLName, "get all"),
-		`SELECT id, type, name
-		FROM account
-		`,
+		`SELECT id, type, name FROM account`,
 	)
 
 	if errQuery != nil {
-		return []internal.Account{}, oops.
-			In("Store").
+		return []domain.Account{}, oops.
+			In("postgres.account").
 			WithContext(ctx).
 			Wrapf(errQuery, "failed to get accounts")
 	}
 	defer rows.Close()
 
-	var accounts []internal.Account
+	accounts, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Account, error) {
+		account := domain.Account{}
+		errScan := row.Scan(&account.ID, &account.Type, &account.Name)
 
-	for rows.Next() {
-		var id int
-		var accountType internal.AccountType
-		var name string
+		if errScan != nil {
+			return account, oops.
+				In("postgres.account").
+				WithContext(ctx).
+				With("row", row).
+				Wrapf(errScan, "failed to scan account")
+		}
 
-		rows.Scan(&id, &accountType, &name)
+		account.Type = domain.AccountType(account.Type)
 
-		account := internal.Account{}
-		account.ID = uint64(id)
-		account.Type = accountType
-		account.Name = name
+		if !account.Type.IsValid() {
+			return account, oops.
+				In("postgres.account").
+				WithContext(ctx).
+				With("type", account.Type).
+				Errorf("account type is invalid")
+		}
 
-		accounts = append(accounts, account)
-	}
+		return account, nil
+	})
 
-	if err := rows.Err(); err != nil {
-		return accounts, fmt.Errorf("rows iteration: %w", err)
-	}
-
-	return accounts, nil
+	return accounts, err
 }
