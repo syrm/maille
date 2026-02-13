@@ -5,35 +5,84 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"iter"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
 )
 
-type Parser struct{
+type TransactionParsedType string
+
+const (
+	TransactionParsedDebit  TransactionParsedType = "DEBIT"
+	TransactionParsedCredit TransactionParsedType = "CREDIT"
+)
+
+type TransactionParsed struct {
+	ID            string
+	Type          TransactionParsedType
+	Payee         string
+	Date          time.Time
+	Amount        float64
+	Currency      string
+	BankAccountID string
+}
+
+type Parser struct {
 	Tracer trace.Tracer
 }
 
-func (p Parser) parseBlock(ctx context.Context, block string) (Transaction, error) {
-	var trn Transaction
-	trn.Account = p.extractTag(block, "DTUSER")
-	trn.DatePosted = p.extractTag(block, "DTPOSTED")
-	trn.Name = p.extractTag(block, "NAME")
-	trn.ID = p.extractTag(block, "FITID")
-	trn.TrnType = p.extractTag(block, "TRNTYPE")
-	amountText := p.extractTag(block, "TRNAMT")
-	amount, err := strconv.ParseFloat(amountText, 64)
-	if err != nil {
-		return trn, p.oops(ctx).
-			With("amount", amountText).
-			Wrapf(err, "failed to parse amount")
+func (p Parser) parseBlock(ctx context.Context, block string) (TransactionParsed, error) {
+	var tx TransactionParsed
+
+	amountRaw := p.extractTag(block, "TRNAMT")
+	amount, errAmount := strconv.ParseFloat(amountRaw, 64)
+
+	if errAmount != nil {
+		return tx, p.oops(ctx).
+			With("amount", amountRaw).
+			Wrapf(errAmount, "failed to parse amount")
+	}
+	tx.Amount = amount
+
+	tx.BankAccountID = p.extractTag(block, "DTUSER")
+
+	if tx.BankAccountID == "" {
+		spew.Dump(block, tx)
 	}
 
-	trn.TrnAmount = amount
+	dateRaw := p.extractTag(block, "DTPOSTED")
+	date, errDate := time.Parse("20060102", dateRaw)
 
-	return trn, nil
+	if errDate != nil {
+		return tx, p.oops(ctx).
+			With("date", dateRaw).
+			Wrapf(errDate, "failed to parse date")
+	}
+	tx.Date = date
+
+	tx.Payee = p.extractTag(block, "NAME")
+
+	tx.ID = p.extractTag(block, "FITID")
+
+	typeRaw := p.extractTag(block, "TRNTYPE")
+
+	switch typeRaw {
+	case "DEBIT":
+		tx.Type = TransactionParsedDebit
+	case "CREDIT":
+		tx.Type = TransactionParsedCredit
+	default:
+		return tx, p.oops(ctx).
+			With("type", typeRaw).
+			Errorf("failed to parse type")
+	}
+
+	return tx, nil
 }
 
 func (p Parser) extractTag(block, tag string) string {
@@ -50,11 +99,11 @@ func (p Parser) extractTag(block, tag string) string {
 	return strings.TrimSpace(rest[:end])
 }
 
-func (p *Parser) oops(ctx context.Context) oops.OopsErrorBuilder {
+func (p Parser) oops(ctx context.Context) oops.OopsErrorBuilder {
 	return oops.In("OFXParser").WithContext(ctx)
 }
 
-func (p *Parser) getCurrency(reader io.Reader) string {
+func (p Parser) getCurrency(reader io.Reader) string {
 	bufreader := bufio.NewReader(reader)
 
 	currency := "NOP"
@@ -81,48 +130,35 @@ func (p *Parser) getCurrency(reader io.Reader) string {
 	}
 }
 
-func (p *Parser) Parse(
-	ctx context.Context,
-	reader io.Reader,
-	batchSize int,
-	process func(context.Context, string, []Transaction) error,
-) error {
-	ctx, span := p.Tracer.Start(ctx, "Parse")
-    defer span.End()
-    
-	currency := p.getCurrency(reader)
-	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
+func (p Parser) Parse(orgCtx context.Context, reader io.Reader) iter.Seq2[TransactionParsed, error] {
+	return func(yield func(TransactionParsed, error) bool) {
+		ctx, span := p.Tracer.Start(orgCtx, "Parse")
+		defer span.End()
 
-	scanner.Split(p.splitOnStmtTrn)
+		currency := p.getCurrency(reader)
+		scanner := bufio.NewScanner(reader)
+		scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 
-	stmts := make([]Transaction, 0, batchSize)
+		scanner.Split(p.splitOnStmtTrn)
 
-	for scanner.Scan() {
-		stmt, errParse := p.parseBlock(ctx, scanner.Text())
+		for scanner.Scan() {
+			transaction, errParse := p.parseBlock(ctx, scanner.Text())
+			transaction.Currency = currency
 
-		if errParse != nil {
-			return p.oops(ctx).Wrapf(errParse, "failed to process")
-		}
-
-		stmts = append(stmts, stmt)
-		if len(stmts) >= batchSize {
-
-			err := process(ctx, currency, stmts)
-			if err != nil {
-				return p.oops(ctx).Wrapf(err, "failed to process")
+			if errParse != nil {
+				yield(TransactionParsed{}, p.oops(ctx).Wrapf(errParse, "failed to process"))
+				return
 			}
-			stmts = stmts[:0]
-		}
-	}
 
-	if len(stmts) > 0 {
-		err := process(ctx, currency, stmts)
-		if err != nil {
-			return p.oops(ctx).Wrapf(err, "failed to process")
+			if !yield(transaction, nil) {
+				return
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			yield(TransactionParsed{}, p.oops(ctx).Wrapf(err, "scanner error"))
 		}
 	}
-	return scanner.Err()
 }
 
 func (p Parser) splitOnStmtTrn(data []byte, atEOF bool) (advance int, token []byte, err error) {

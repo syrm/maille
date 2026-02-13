@@ -21,6 +21,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/syrm/maille/internal"
 	"github.com/syrm/maille/internal/ofx"
 	"github.com/syrm/maille/internal/postgres"
 	"github.com/syrm/maille/internal/web"
@@ -78,19 +79,32 @@ func run(
 		return err
 	}
 
-	postgresTransaction, err := postgres.BuildTransaction(ctx, pool, tracerProvider.GetTracer("postgres-transaction"))
+	transactionStore, err := postgres.BuildTransaction(ctx, pool, tracerProvider.GetTracer("postgres.transaction"))
 	if err != nil {
 		return err
 	}
 
+	accountStore := postgres.BuildAccount(ctx, pool, tracerProvider.GetTracer("postgres.Account"))
+	bankAccountStore := postgres.BuildBankAccount(ctx, pool, tracerProvider.GetTracer("postgres.Account"))
+
+	parser := ofx.Parser{
+		Tracer: tracerProvider.GetTracer("ofx.Parser"),
+	}
+
+	importer := internal.Importer{
+		Parser:           parser,
+		TransactionStore: transactionStore,
+		AccountStore:     accountStore,
+		BankAccountStore: bankAccountStore,
+		Tracer:           tracerProvider.GetTracer("importer"),
+		Logger:           logger,
+	}
+
 	upload := web.Upload{
-		Parser: ofx.Parser{
-			Tracer: tracerProvider.GetTracer("ofx"),
-		},
-		PostgresTransaction: *postgresTransaction,
-		Engine:              engine,
-		Tracer:              tracerProvider.GetTracer("maille-web"),
-		Logger:              logger,
+		Importer: importer,
+		Engine:   engine,
+		Tracer:   tracerProvider.GetTracer("maille-web"),
+		Logger:   logger,
 	}
 
 	r := chi.NewRouter()
@@ -99,6 +113,8 @@ func run(
 	)
 	r.Use(middleware.Recoverer)
 	r.Mount("/", upload.Router())
+
+	logger.InfoContext(ctx, "launch web server", slog.Any("port", 13000))
 
 	if err := http.ListenAndServe(":13000", r); err != nil {
 		logger.ErrorContext(ctx, "failed to start server", slog.Any("error", err))

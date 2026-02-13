@@ -10,14 +10,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
-	"github.com/syrm/maille/internal"
-	"github.com/syrm/maille/internal/ofx"
+	"github.com/syrm/maille/internal/domain"
 	"go.opentelemetry.io/otel/trace"
 )
-
-var mappingAccount = map[string]string{
-	"123456789": "FR:BNP:Checking",
-}
 
 type Transaction struct {
 	pool   *pgxpool.Pool
@@ -31,7 +26,7 @@ func BuildTransaction(ctx context.Context, pool *pgxpool.Pool, tracer trace.Trac
 	}, nil
 }
 
-func (s *Transaction) GetTransactions(ctx context.Context) ([]internal.Transaction, error) {
+func (s *Transaction) GetTransactions(ctx context.Context) ([]domain.Transaction, error) {
 	ctx, span := s.tracer.Start(ctx, "GetTransactions")
 	defer span.End()
 
@@ -45,17 +40,17 @@ func (s *Transaction) GetTransactions(ctx context.Context) ([]internal.Transacti
 	)
 
 	if errQuery != nil {
-		return []internal.Transaction{}, oops.
+		return []domain.Transaction{}, oops.
 			In("Store").
 			WithContext(ctx).
 			Wrapf(errQuery, "failed to get transactions")
 	}
 	defer rows.Close()
 
-	var transactions []internal.Transaction
+	var transactions []domain.Transaction
 
-	transaction := internal.Transaction{}
-	postings := []internal.Posting{}
+	transaction := domain.Transaction{}
+	postings := []domain.Posting{}
 	lastID := 0
 	for rows.Next() {
 		var id int
@@ -71,19 +66,19 @@ func (s *Transaction) GetTransactions(ctx context.Context) ([]internal.Transacti
 			transaction.Postings = postings
 			transactions = append(transactions, transaction)
 
-			transaction = internal.Transaction{}
-			postings = []internal.Posting{}
+			transaction = domain.Transaction{}
+			postings = []domain.Posting{}
 		}
 
 		transaction.ID = uint64(id)
 		transaction.Date = date
 		transaction.Payee = payee
 		transaction.Narration = narration
-		posting := internal.Posting{
-			Account: account,
-			Amount:  amount,
-		}
-		postings = append(postings, posting)
+		// posting := domain.Posting{
+		// 	Account: account,
+		// 	Amount:  amount,
+		// }
+		// postings = append(postings, posting)
 		lastID = id
 	}
 
@@ -94,63 +89,48 @@ func (s *Transaction) GetTransactions(ctx context.Context) ([]internal.Transacti
 	return transactions, nil
 }
 
-func (s *Transaction) Process(ctx context.Context, currency string, stmts []ofx.Transaction) error {
-	ctx, span := s.tracer.Start(ctx, "Process")
+func (s *Transaction) Save(ctx context.Context, transactions []domain.Transaction) error {
+	ctx, span := s.tracer.Start(ctx, "Transaction")
 	defer span.End()
 
-	rowCurrency := s.pool.QueryRow(context.WithValue(ctx, SQLName, "get currency"), `SELECT id FROM currency WHERE name = $1`, currency)
 	node, _ := snowflake.NewNode(1)
 
-	var currencyID uint32
-	errScan := rowCurrency.Scan(&currencyID)
-
-	if errScan != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errScan, "failed to scan row")
-	}
-
-	rows := make([][]any, 0, len(stmts))
-	rowsPos := make([][]any, 0, len(stmts)*3)
-	for _, stmt := range stmts {
-		if _, ok := mappingAccount[stmt.Account]; !ok {
-			return oops.
-				In("Store").
-				WithContext(ctx).
-				With("account", stmt.Account).
-				Errorf("account not found")
-		}
+	rows := make([][]any, 0, len(transactions))
+	rowsPos := make([][]any, 0, len(transactions)*3)
+	for _, transaction := range transactions {
+		// if _, ok := mappingAccount[transaction.Account]; !ok {
+		// 	return oops.
+		// 		In("Store").
+		// 		WithContext(ctx).
+		// 		With("account", transaction.Account).
+		// 		Errorf("account not found")
+		// }
 
 		transactionID := node.Generate()
-		positionID1 := node.Generate()
-		positionID2 := node.Generate()
 
 		// Build date.
+		date := transaction.Date.Format(time.DateOnly)
 		var sb strings.Builder
 		sb.Grow(10)
-		sb.WriteString(stmt.DatePosted[0:4])
+		sb.WriteString(date[0:4])
 		sb.WriteByte('-')
-		sb.WriteString(stmt.DatePosted[4:6])
+		sb.WriteString(date[5:7])
 		sb.WriteByte('-')
-		sb.WriteString(stmt.DatePosted[6:8])
+		sb.WriteString(date[8:10])
 
-		rows = append(rows, []any{transactionID, sb.String(), true, stmt.Name, stmt.ID})
-		rowsPos = append(
-			rowsPos,
-			[]any{
-				positionID1,
-				transactionID,
-				"ASSETS",
-				mappingAccount[stmt.Account],
-				stmt.TrnAmount,
-				currencyID,
-			},
-		)
-		if stmt.TrnType == "CREDIT" {
-			rowsPos = append(rowsPos, []any{positionID2, transactionID, "INCOME", "Others", -1 * stmt.TrnAmount, currencyID})
-		} else {
-			rowsPos = append(rowsPos, []any{positionID2, transactionID, "EXPENSES", "Others", -1 * stmt.TrnAmount, currencyID})
+		rows = append(rows, []any{transactionID, sb.String(), true, transaction.Payee, transaction.ExternalID})
+
+		for _, posting := range transaction.Postings {
+			rowsPos = append(
+				rowsPos,
+				[]any{
+					node.Generate(),
+					transactionID,
+					posting.AccountID,
+					posting.Amount,
+					posting.Currency.ID,
+				},
+			)
 		}
 	}
 
@@ -224,7 +204,7 @@ func (s *Transaction) Process(ctx context.Context, currency string, stmts []ofx.
 	_, errCopyPosting := tx.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy posting"),
 		pgx.Identifier{"posting"},
-		[]string{"id", "transaction_id", "type", "account", "amount", "currency_id"},
+		[]string{"id", "transaction_id", "account_id", "amount", "currency_id"},
 		pgx.CopyFromRows(rowsPos),
 	)
 	if errCopyPosting != nil {
