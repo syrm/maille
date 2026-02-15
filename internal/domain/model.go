@@ -3,6 +3,8 @@ package domain
 import (
 	"slices"
 	"time"
+
+	"github.com/expr-lang/expr/vm"
 )
 
 type Transaction struct {
@@ -62,4 +64,11 @@ type BankAccount struct {
 	Name       string
 	AccountID  uint64
 	ExternalID string
+}
+
+type TransactionClassifierRule struct {
+	ID      uint64
+	Rule    string
+	Account Account
+	Program *vm.Program
 }

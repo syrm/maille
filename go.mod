@@ -1,6 +1,6 @@
 module github.com/syrm/maille
 
-go 1.25.6
+go 1.26.0
 
 require (
 	github.com/abiosoft/mold v0.0.0-20250328135240-0a4c28cb836a
@@ -38,6 +38,7 @@ require (
 
 require (
 	github.com/bwmarrin/snowflake v0.3.0
+	github.com/expr-lang/expr v1.17.8
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/riandyrn/otelchi v0.12.2
 	github.com/samber/oops v1.21.0

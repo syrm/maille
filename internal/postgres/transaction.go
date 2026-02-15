@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -19,37 +18,43 @@ type Transaction struct {
 	tracer trace.Tracer
 }
 
-func BuildTransaction(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) (*Transaction, error) {
+func BuildTransaction(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) *Transaction {
 	return &Transaction{
 		pool:   pool,
 		tracer: tracer,
-	}, nil
+	}
 }
 
-func (s *Transaction) GetTransactions(ctx context.Context) ([]domain.Transaction, error) {
+func (s *Transaction) GetAll(ctx context.Context, after uint64, size uint) ([]domain.Transaction, error) {
 	ctx, span := s.tracer.Start(ctx, "GetTransactions")
 	defer span.End()
 
 	rows, errQuery := s.pool.Query(
 		context.WithValue(ctx, SQLName, "get transactions"),
-		`SELECT transaction.id, date, payee, narration, account, amount
+		`SELECT transaction.id, date, payee, narration, account_id, amount
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
+		WHERE transaction.id > @after
 		ORDER BY transaction.id
+		LIMIT @size
 		`,
+		pgx.NamedArgs{
+			"after": after,
+			"size":  size,
+		},
 	)
 
 	if errQuery != nil {
-		return []domain.Transaction{}, oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errQuery, "failed to get transactions")
+		return []domain.Transaction{},
+			oops.
+				In("Transaction").
+				WithContext(ctx).
+				Wrapf(errQuery, "failed to get transactions")
 	}
 	defer rows.Close()
 
-	var transactions []domain.Transaction
-
-	transaction := domain.Transaction{}
+	txs := make([]domain.Transaction, 0, size)
+	tx := domain.Transaction{}
 	postings := []domain.Posting{}
 	lastID := 0
 	for rows.Next() {
@@ -57,36 +62,40 @@ func (s *Transaction) GetTransactions(ctx context.Context) ([]domain.Transaction
 		var date time.Time
 		var payee string
 		var narration *string
-		var account string
+		var accountID uint64
 		var amount float64
 
-		rows.Scan(&id, &date, &payee, &narration, &account, &amount)
+		rows.Scan(&id, &date, &payee, &narration, &accountID, &amount)
 
 		if lastID != 0 && lastID != id {
-			transaction.Postings = postings
-			transactions = append(transactions, transaction)
+			tx.Postings = postings
+			txs = append(txs, tx)
 
-			transaction = domain.Transaction{}
+			tx = domain.Transaction{}
 			postings = []domain.Posting{}
 		}
 
-		transaction.ID = uint64(id)
-		transaction.Date = date
-		transaction.Payee = payee
-		transaction.Narration = narration
-		// posting := domain.Posting{
-		// 	Account: account,
-		// 	Amount:  amount,
-		// }
-		// postings = append(postings, posting)
+		tx.ID = uint64(id)
+		tx.Date = date
+		tx.Payee = payee
+		tx.Narration = narration
+		posting := domain.Posting{
+			AccountID: accountID,
+			Amount:    amount,
+		}
+		postings = append(postings, posting)
 		lastID = id
 	}
 
 	if err := rows.Err(); err != nil {
-		return transactions, fmt.Errorf("rows iteration: %w", err)
+		return []domain.Transaction{},
+			oops.
+				In("Transaction").
+				WithContext(ctx).
+				Wrapf(err, "failed to row iterate")
 	}
 
-	return transactions, nil
+	return txs, nil
 }
 
 func (s *Transaction) Save(ctx context.Context, transactions []domain.Transaction) error {
@@ -98,14 +107,6 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	rows := make([][]any, 0, len(transactions))
 	rowsPos := make([][]any, 0, len(transactions)*3)
 	for _, transaction := range transactions {
-		// if _, ok := mappingAccount[transaction.Account]; !ok {
-		// 	return oops.
-		// 		In("Store").
-		// 		WithContext(ctx).
-		// 		With("account", transaction.Account).
-		// 		Errorf("account not found")
-		// }
-
 		transactionID := node.Generate()
 
 		// Build date.
@@ -138,7 +139,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 
 	if errBegin != nil {
 		return oops.
-			In("Store").
+			In("Transaction").
 			WithContext(ctx).
 			Wrapf(errBegin, "failed to begin transaction")
 	}
@@ -151,7 +152,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// )
 	// if errDrop1 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop1, "failed to exec drop constraint currency_id")
 	// }
@@ -162,7 +163,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// )
 	// if errDrop2 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop2, "failed to exec drop constraint currency_id")
 	// }
@@ -173,7 +174,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// )
 	// if errDrop3 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop3, "failed to exec drop constraint price_currency_id")
 	// }
@@ -184,7 +185,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// )
 	// if errDrop4 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop4, "failed to drop constraint")
 	// }
@@ -197,7 +198,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	)
 	if errCopyTr != nil {
 		return oops.
-			In("Store").
+			In("Transaction").
 			WithContext(ctx).
 			Wrapf(errCopyTr, "failed to exec copy transaction")
 	}
@@ -209,7 +210,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	)
 	if errCopyPosting != nil {
 		return oops.
-			In("Store").
+			In("Transaction").
 			WithContext(ctx).
 			Wrapf(errCopyPosting, "failed to exec copy posting")
 	}
@@ -220,7 +221,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// )
 	// if errAdd1 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errAdd1, "failed to add constraint currency_id")
 	// }
@@ -229,21 +230,21 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// )
 	// if errAdd2 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errAdd2, "failed to add constraint origin_position_id")
 	// }
 	// _, errAdd3 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint price_currency_id"), "ALTER TABLE posting ADD CONSTRAINT posting_price_currency_id_fkey FOREIGN KEY (price_currency_id) REFERENCES currency(id)")
 	// if errAdd3 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errAdd3, "failed to add constraint currency_id")
 	// }
 	// _, errAdd4 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint transaction_id"), "ALTER TABLE posting ADD CONSTRAINT posting_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transaction(id)")
 	// if errAdd4 != nil {
 	// 	return oops.
-	// 		In("Store").
+	// 		In("Transaction").
 	// 		WithContext(ctx).
 	// 		Wrapf(errAdd4, "failed to add constraint transaction_id")
 	// }
@@ -251,7 +252,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	errCmt := tx.Commit(context.WithValue(ctx, SQLName, "commit transaction"))
 	if errCmt != nil {
 		return oops.
-			In("Store").
+			In("Transaction").
 			WithContext(ctx).
 			Wrapf(errCmt, "failed to commit data")
 	}

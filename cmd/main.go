@@ -79,14 +79,11 @@ func run(
 		return err
 	}
 
-	transactionStore, err := postgres.BuildTransaction(ctx, pool, tracerProvider.GetTracer("postgres.transaction"))
-	if err != nil {
-		return err
-	}
-
+	txStore := postgres.BuildTransaction(ctx, pool, tracerProvider.GetTracer("postgres.transaction"))
 	accountStore := postgres.BuildAccount(ctx, pool, tracerProvider.GetTracer("postgres.account"))
 	bankAccountStore := postgres.BuildBankAccount(ctx, pool, tracerProvider.GetTracer("postgres.bankaccount"))
 	currencyStore := postgres.BuildCurrency(ctx, pool, tracerProvider.GetTracer("postgres.currency"))
+	txClassifierRuleStore := postgres.BuildTransactionClassifierRule(ctx, pool, tracerProvider.GetTracer("postgres.transactionclassifierrule"))
 
 	parser := ofx.Parser{
 		Tracer: tracerProvider.GetTracer("ofx.Parser"),
@@ -94,7 +91,7 @@ func run(
 
 	importer := internal.Importer{
 		Parser:           parser,
-		TransactionStore: transactionStore,
+		TransactionStore: txStore,
 		AccountStore:     accountStore,
 		BankAccountStore: bankAccountStore,
 		CurrencyStore:    currencyStore,
@@ -102,11 +99,23 @@ func run(
 		Logger:           logger,
 	}
 
+	classifier := internal.Classifier{
+		TransactionProvider: txStore,
+		RuleProvider:        txClassifierRuleStore,
+		AccountProvider:     accountStore,
+		Tracer:              tracerProvider.GetTracer("classifier"),
+		Logger:              logger,
+	}
+
 	upload := web.Upload{
-		Importer: importer,
-		Engine:   engine,
-		Tracer:   tracerProvider.GetTracer("maille-web"),
-		Logger:   logger,
+		AccountStore:     accountStore,
+		TransactionStore: txStore,
+		// TransactionClassifierRuleStore: txClassifierRuleStore,
+		Importer:   importer,
+		Classifier: classifier,
+		Engine:     engine,
+		Tracer:     tracerProvider.GetTracer("maille-web"),
+		Logger:     logger,
 	}
 
 	r := chi.NewRouter()

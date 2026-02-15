@@ -24,7 +24,7 @@ type Parser interface {
 
 type TransactionStore interface {
 	Save(context.Context, []domain.Transaction) error
-	GetTransactions(context.Context) ([]domain.Transaction, error)
+	GetAll(context.Context, uint64, uint) ([]domain.Transaction, error)
 }
 
 type AccountStore interface {
