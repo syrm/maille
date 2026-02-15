@@ -12,6 +12,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/oops"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -20,6 +21,13 @@ type TransactionParsedType string
 const (
 	TransactionParsedDebit  TransactionParsedType = "DEBIT"
 	TransactionParsedCredit TransactionParsedType = "CREDIT"
+)
+
+var (
+	STMTopen     = []byte("<STMTTRN>")
+	STMTopenLen  = len(STMTopen)
+	STMTclose    = []byte("</STMTTRN>")
+	STMTcloseLen = len(STMTclose)
 )
 
 type TransactionParsed struct {
@@ -103,7 +111,10 @@ func (p Parser) oops(ctx context.Context) oops.OopsErrorBuilder {
 	return oops.In("OFXParser").WithContext(ctx)
 }
 
-func (p Parser) getCurrency(reader io.Reader) string {
+func (p Parser) getCurrency(ctx context.Context, reader io.Reader) string {
+	ctx, span := p.Tracer.Start(ctx, "getCurrency")
+	defer span.End()
+
 	bufreader := bufio.NewReader(reader)
 
 	currency := "NOP"
@@ -131,15 +142,32 @@ func (p Parser) getCurrency(reader io.Reader) string {
 }
 
 func (p Parser) Parse(orgCtx context.Context, reader io.Reader) iter.Seq2[TransactionParsed, error] {
+	var timeToSplit int64 = 0
+	var countSplit int64 = 0
 	return func(yield func(TransactionParsed, error) bool) {
 		ctx, span := p.Tracer.Start(orgCtx, "Parse")
-		defer span.End()
+		defer func() {
+			span.AddEvent("splitOnStmtTrn", trace.WithAttributes(
+				attribute.Int64("call_count", countSplit),
+				attribute.Float64("total_duration_avg_us", float64(timeToSplit)/float64(countSplit)),
+				attribute.Int64("total_duration_us", timeToSplit),
+			),
+			)
+			span.End()
+		}()
 
-		currency := p.getCurrency(reader)
+		currency := p.getCurrency(ctx, reader)
 		scanner := bufio.NewScanner(reader)
 		scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 
-		scanner.Split(p.splitOnStmtTrn)
+		scanner.Split(func(data []byte, atEOF bool) (int, []byte, error) {
+			start := time.Now()
+			advance, token, err := p.splitOnStmtTrn(data, atEOF)
+			timeToSplit += time.Since(start).Microseconds()
+			countSplit++
+
+			return advance, token, err
+		})
 
 		for scanner.Scan() {
 			transaction, errParse := p.parseBlock(ctx, scanner.Text())
@@ -162,10 +190,7 @@ func (p Parser) Parse(orgCtx context.Context, reader io.Reader) iter.Seq2[Transa
 }
 
 func (p Parser) splitOnStmtTrn(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	open := []byte("<STMTTRN>")
-	close := []byte("</STMTTRN>")
-
-	start := bytes.Index(data, open)
+	start := bytes.Index(data, STMTopen)
 	if start == -1 {
 		if atEOF {
 			return len(data), nil, nil
@@ -173,7 +198,7 @@ func (p Parser) splitOnStmtTrn(data []byte, atEOF bool) (advance int, token []by
 		return 0, nil, nil
 	}
 
-	end := bytes.Index(data[start:], close)
+	end := bytes.Index(data[start:], STMTclose)
 	if end == -1 {
 		if atEOF {
 			return len(data), nil, nil
@@ -181,8 +206,5 @@ func (p Parser) splitOnStmtTrn(data []byte, atEOF bool) (advance int, token []by
 		return 0, nil, nil
 	}
 
-	blockStart := start + len(open)
-	blockEnd := start + end
-	advance = start + end + len(close)
-	return advance, data[blockStart:blockEnd], nil
+	return start + end + STMTcloseLen, data[start+STMTopenLen : start+end], nil
 }

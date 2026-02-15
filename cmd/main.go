@@ -84,8 +84,9 @@ func run(
 		return err
 	}
 
-	accountStore := postgres.BuildAccount(ctx, pool, tracerProvider.GetTracer("postgres.Account"))
-	bankAccountStore := postgres.BuildBankAccount(ctx, pool, tracerProvider.GetTracer("postgres.Account"))
+	accountStore := postgres.BuildAccount(ctx, pool, tracerProvider.GetTracer("postgres.account"))
+	bankAccountStore := postgres.BuildBankAccount(ctx, pool, tracerProvider.GetTracer("postgres.bankaccount"))
+	currencyStore := postgres.BuildCurrency(ctx, pool, tracerProvider.GetTracer("postgres.currency"))
 
 	parser := ofx.Parser{
 		Tracer: tracerProvider.GetTracer("ofx.Parser"),
@@ -96,6 +97,7 @@ func run(
 		TransactionStore: transactionStore,
 		AccountStore:     accountStore,
 		BankAccountStore: bankAccountStore,
+		CurrencyStore:    currencyStore,
 		Tracer:           tracerProvider.GetTracer("importer"),
 		Logger:           logger,
 	}
