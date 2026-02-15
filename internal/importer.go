@@ -35,11 +35,16 @@ type BankAccountStore interface {
 	GetAll(context.Context) ([]domain.BankAccount, error)
 }
 
+type CurrencyStore interface {
+	GetAll(context.Context) ([]domain.Currency, error)
+}
+
 type Importer struct {
 	Parser           Parser
 	TransactionStore TransactionStore
 	AccountStore     AccountStore
 	BankAccountStore BankAccountStore
+	CurrencyStore    CurrencyStore
 	Tracer           trace.Tracer
 	Logger           *slog.Logger
 }
@@ -48,19 +53,21 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 	ctx, span := i.Tracer.Start(ctx, "Import")
 	defer span.End()
 
-	accounts, errAccount := i.AccountStore.GetAll(ctx)
-	if errAccount != nil {
-		return oops.
-			In("importer").
-			WithContext(ctx).
-			Wrapf(errAccount, "failed to get accounts")
-	}
+	{
+		accounts, errAccount := i.AccountStore.GetAll(ctx)
+		if errAccount != nil {
+			return oops.
+				In("importer").
+				WithContext(ctx).
+				Wrapf(errAccount, "failed to get accounts")
+		}
 
-	for _, account := range accounts {
-		if account.Type == defaultExpenseTransaction.Type &&
-			account.Name == defaultExpenseTransaction.Name {
-			defaultExpenseTransaction.ID = account.ID
-			break
+		for _, account := range accounts {
+			if account.Type == defaultExpenseTransaction.Type &&
+				account.Name == defaultExpenseTransaction.Name {
+				defaultExpenseTransaction.ID = account.ID
+				break
+			}
 		}
 	}
 
@@ -76,6 +83,20 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 
 		for _, bankAccount := range bankAccounts {
 			bankAccountsID[bankAccount.ExternalID] = bankAccount.ID
+		}
+	}
+
+	currenciesID := make(map[string]domain.Currency)
+	{
+		currencies, errCurrency := i.CurrencyStore.GetAll(ctx)
+		if errCurrency != nil {
+			return oops.
+				In("importer").
+				WithContext(ctx).
+				Wrapf(errCurrency, "failed to get currencies")
+		}
+		for _, currency := range currencies {
+			currenciesID[currency.Name] = currency
 		}
 	}
 
@@ -101,6 +122,16 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 				Errorf("bankaccount external_id not found")
 		}
 
+		currency, ok := currenciesID[transactionParsed.Currency]
+
+		if !ok {
+			return oops.
+				In("importer").
+				WithContext(ctx).
+				With("currency", transactionParsed.Currency).
+				Errorf("currency id not found")
+		}
+
 		transactions = append(transactions, domain.Transaction{
 			ExternalID: transactionParsed.ID,
 			Date:       transactionParsed.Date,
@@ -110,18 +141,12 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 				{
 					AccountID: mainAccountID,
 					Amount:    transactionParsed.Amount,
-					Currency: domain.Currency{
-						ID:   1,
-						Name: transactionParsed.Currency,
-					},
+					Currency:  currency,
 				},
 				{
 					AccountID: defaultExpenseTransaction.ID,
 					Amount:    -1 * transactionParsed.Amount,
-					Currency: domain.Currency{
-						ID:   1,
-						Name: transactionParsed.Currency,
-					},
+					Currency:  currency,
 				},
 			},
 		})

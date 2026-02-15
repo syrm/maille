@@ -145,49 +145,49 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 
 	defer tx.Rollback(context.WithValue(ctx, SQLName, "rollback transaction"))
 
-	_, errDrop1 := tx.Exec(
-		context.WithValue(ctx, SQLName, "drop constraint currency_id"),
-		"ALTER TABLE posting DROP CONSTRAINT posting_currency_id_fkey",
-	)
-	if errDrop1 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errDrop1, "failed to exec drop constraint currency_id")
-	}
+	// _, errDrop1 := tx.Exec(
+	// 	context.WithValue(ctx, SQLName, "drop constraint currency_id"),
+	// 	"ALTER TABLE posting DROP CONSTRAINT posting_currency_id_fkey",
+	// )
+	// if errDrop1 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errDrop1, "failed to exec drop constraint currency_id")
+	// }
 
-	_, errDrop2 := tx.Exec(
-		context.WithValue(ctx, SQLName, "drop constraint origin_position_id"),
-		"ALTER TABLE posting DROP CONSTRAINT posting_origin_position_id_fkey",
-	)
-	if errDrop2 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errDrop2, "failed to exec drop constraint currency_id")
-	}
+	// _, errDrop2 := tx.Exec(
+	// 	context.WithValue(ctx, SQLName, "drop constraint origin_position_id"),
+	// 	"ALTER TABLE posting DROP CONSTRAINT posting_origin_position_id_fkey",
+	// )
+	// if errDrop2 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errDrop2, "failed to exec drop constraint currency_id")
+	// }
 
-	_, errDrop3 := tx.Exec(
-		context.WithValue(ctx, SQLName, "drop constraint price_currency_id"),
-		"ALTER TABLE posting DROP CONSTRAINT posting_price_currency_id_fkey",
-	)
-	if errDrop3 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errDrop3, "failed to exec drop constraint price_currency_id")
-	}
+	// _, errDrop3 := tx.Exec(
+	// 	context.WithValue(ctx, SQLName, "drop constraint price_currency_id"),
+	// 	"ALTER TABLE posting DROP CONSTRAINT posting_price_currency_id_fkey",
+	// )
+	// if errDrop3 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errDrop3, "failed to exec drop constraint price_currency_id")
+	// }
 
-	_, errDrop4 := tx.Exec(
-		context.WithValue(ctx, SQLName, "drop constraint transaction_id"),
-		"ALTER TABLE posting DROP CONSTRAINT posting_transaction_id_fkey",
-	)
-	if errDrop4 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errDrop4, "failed to drop constraint")
-	}
+	// _, errDrop4 := tx.Exec(
+	// 	context.WithValue(ctx, SQLName, "drop constraint transaction_id"),
+	// 	"ALTER TABLE posting DROP CONSTRAINT posting_transaction_id_fkey",
+	// )
+	// if errDrop4 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errDrop4, "failed to drop constraint")
+	// }
 
 	_, errCopyTr := tx.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy transaction"),
@@ -214,39 +214,39 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 			Wrapf(errCopyPosting, "failed to exec copy posting")
 	}
 
-	_, errAdd1 := tx.Exec(
-		context.WithValue(ctx, SQLName, "add constraint currency_id"),
-		`ALTER TABLE posting ADD CONSTRAINT posting_currency_id_fkey FOREIGN KEY (currency_id) REFERENCES currency(id)`,
-	)
-	if errAdd1 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errAdd1, "failed to add constraint currency_id")
-	}
-	_, errAdd2 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint origin_position_id"),
-		"ALTER TABLE posting ADD CONSTRAINT posting_origin_position_id_fkey FOREIGN KEY (origin_position_id) REFERENCES position(id)",
-	)
-	if errAdd2 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errAdd2, "failed to add constraint origin_position_id")
-	}
-	_, errAdd3 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint price_currency_id"), "ALTER TABLE posting ADD CONSTRAINT posting_price_currency_id_fkey FOREIGN KEY (price_currency_id) REFERENCES currency(id)")
-	if errAdd3 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errAdd3, "failed to add constraint currency_id")
-	}
-	_, errAdd4 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint transaction_id"), "ALTER TABLE posting ADD CONSTRAINT posting_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transaction(id)")
-	if errAdd4 != nil {
-		return oops.
-			In("Store").
-			WithContext(ctx).
-			Wrapf(errAdd4, "failed to add constraint transaction_id")
-	}
+	// _, errAdd1 := tx.Exec(
+	// 	context.WithValue(ctx, SQLName, "add constraint currency_id"),
+	// 	`ALTER TABLE posting ADD CONSTRAINT posting_currency_id_fkey FOREIGN KEY (currency_id) REFERENCES currency(id)`,
+	// )
+	// if errAdd1 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errAdd1, "failed to add constraint currency_id")
+	// }
+	// _, errAdd2 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint origin_position_id"),
+	// 	"ALTER TABLE posting ADD CONSTRAINT posting_origin_position_id_fkey FOREIGN KEY (origin_position_id) REFERENCES position(id)",
+	// )
+	// if errAdd2 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errAdd2, "failed to add constraint origin_position_id")
+	// }
+	// _, errAdd3 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint price_currency_id"), "ALTER TABLE posting ADD CONSTRAINT posting_price_currency_id_fkey FOREIGN KEY (price_currency_id) REFERENCES currency(id)")
+	// if errAdd3 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errAdd3, "failed to add constraint currency_id")
+	// }
+	// _, errAdd4 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint transaction_id"), "ALTER TABLE posting ADD CONSTRAINT posting_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transaction(id)")
+	// if errAdd4 != nil {
+	// 	return oops.
+	// 		In("Store").
+	// 		WithContext(ctx).
+	// 		Wrapf(errAdd4, "failed to add constraint transaction_id")
+	// }
 
 	errCmt := tx.Commit(context.WithValue(ctx, SQLName, "commit transaction"))
 	if errCmt != nil {
