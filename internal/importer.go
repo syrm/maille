@@ -8,9 +8,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/oops"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/syrm/maille/internal/domain"
 	"github.com/syrm/maille/internal/ofx"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var defaultExpenseTransaction = domain.Account{
@@ -24,7 +25,7 @@ type Parser interface {
 
 type TransactionStore interface {
 	Save(context.Context, []domain.Transaction) error
-	GetAll(context.Context, uint64, uint) ([]domain.Transaction, error)
+	GetAllToClassify(context.Context, uint64, uint) (map[uint64]domain.TransactionToClassify, error)
 }
 
 type AccountStore interface {

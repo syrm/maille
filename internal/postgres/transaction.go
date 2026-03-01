@@ -9,8 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
-	"github.com/syrm/maille/internal/domain"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/syrm/maille/internal/domain"
+	"github.com/syrm/maille/internal/postgres/dto"
 )
 
 type Transaction struct {
@@ -18,24 +20,26 @@ type Transaction struct {
 	tracer trace.Tracer
 }
 
-func BuildTransaction(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) *Transaction {
+func BuildTransaction(pool *pgxpool.Pool, tracer trace.Tracer) *Transaction {
 	return &Transaction{
 		pool:   pool,
 		tracer: tracer,
 	}
 }
 
-func (s *Transaction) GetAll(ctx context.Context, after uint64, size uint) ([]domain.Transaction, error) {
-	ctx, span := s.tracer.Start(ctx, "GetTransactions")
+func (t *Transaction) GetAllWithPosting(ctx context.Context, after uint64, size uint) (map[uint64]*domain.Transaction, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetAllWithPosting")
 	defer span.End()
 
-	rows, errQuery := s.pool.Query(
+	txs := make(map[uint64]*domain.Transaction, size)
+
+	rows, errQuery := t.pool.Query(
 		context.WithValue(ctx, SQLName, "get transactions"),
-		`SELECT transaction.id, date, payee, narration, account_id, amount
+		`SELECT transaction.id, date, payee, narration, posting.id, account_id, amount
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
 		WHERE transaction.id > @after
-		ORDER BY transaction.id
+		ORDER BY transaction.id, posting.id
 		LIMIT @size
 		`,
 		pgx.NamedArgs{
@@ -45,61 +49,140 @@ func (s *Transaction) GetAll(ctx context.Context, after uint64, size uint) ([]do
 	)
 
 	if errQuery != nil {
-		return []domain.Transaction{},
-			oops.
-				In("Transaction").
-				WithContext(ctx).
-				Wrapf(errQuery, "failed to get transactions")
+		return txs, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get transactions")
 	}
-	defer rows.Close()
 
-	txs := make([]domain.Transaction, 0, size)
-	tx := domain.Transaction{}
-	postings := []domain.Posting{}
-	lastID := 0
-	for rows.Next() {
-		var id int
-		var date time.Time
-		var payee string
-		var narration *string
-		var accountID uint64
-		var amount float64
+	var (
+		id        uint64
+		date      time.Time
+		payee     string
+		narration *string
+		postingID uint64
+		accountID uint64
+		amount    float64
+	)
 
-		rows.Scan(&id, &date, &payee, &narration, &accountID, &amount)
+	_, errScan := pgx.ForEachRow(
+		rows,
+		[]any{&id, &date, &payee, &narration, &postingID, &accountID, &amount},
+		func() error {
 
-		if lastID != 0 && lastID != id {
-			tx.Postings = postings
-			txs = append(txs, tx)
+			tx, exist := txs[id]
 
-			tx = domain.Transaction{}
-			postings = []domain.Posting{}
-		}
+			if !exist {
+				tx = &domain.Transaction{
+					ID:        id,
+					Date:      date,
+					Payee:     payee,
+					Narration: narration,
+				}
+				txs[id] = tx
+			}
 
-		tx.ID = uint64(id)
-		tx.Date = date
-		tx.Payee = payee
-		tx.Narration = narration
-		posting := domain.Posting{
-			AccountID: accountID,
-			Amount:    amount,
-		}
-		postings = append(postings, posting)
-		lastID = id
+			tx.Postings = append(tx.Postings, domain.Posting{
+				ID:        postingID,
+				AccountID: accountID,
+				Amount:    amount,
+			})
+
+			return nil
+		},
+	)
+
+	if errScan != nil {
+		return txs, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errScan, "failed to scan transaction")
 	}
 
 	if err := rows.Err(); err != nil {
-		return []domain.Transaction{},
-			oops.
-				In("Transaction").
-				WithContext(ctx).
-				Wrapf(err, "failed to row iterate")
+		return txs, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(err, "failed to row iterate")
 	}
 
 	return txs, nil
 }
 
-func (s *Transaction) Save(ctx context.Context, transactions []domain.Transaction) error {
-	ctx, span := s.tracer.Start(ctx, "Transaction")
+func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size uint) (map[uint64]domain.TransactionToClassify, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetAllToClassify")
+	defer span.End()
+
+	txs := make(map[uint64]domain.TransactionToClassify, size)
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "get transactions to classify"),
+		`SELECT transaction.id,
+       date,
+       payee,
+       (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
+       (ARRAY_AGG(posting.id ORDER BY posting.id))[2] as posting_id,
+       (ARRAY_AGG(account.id ORDER BY posting.id))[2] as account_id,
+       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
+       (ARRAY_AGG(currency.name ORDER BY posting.id))[1] as currency
+		FROM transaction
+		INNER JOIN posting ON (posting.transaction_id = transaction.id)
+		INNER JOIN currency ON (currency.id = posting.currency_id)
+		INNER JOIN account ON (account.id = posting.account_id)
+		WHERE transaction.id > @after
+		GROUP BY transaction.id
+		ORDER BY transaction.id
+		LIMIT @size`,
+		pgx.NamedArgs{
+			"after": after,
+			"size":  size,
+		})
+
+	if errQuery != nil {
+		return nil, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get transactions to classify")
+	}
+
+	//var (
+	//	id           uint64
+	//	date         time.Time
+	//	payee        string
+	//	accountName  string
+	//	narration    *string
+	//	accountID    uint64
+	//	amount       float64
+	//	currencyName string
+	//)
+
+	dtos, err := pgx.CollectRows(rows, pgx.RowToStructByName[dto.TransactionToClassify])
+
+	if err != nil {
+		return nil, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to collect rows transactions to classify")
+	}
+
+	for _, toClassify := range dtos {
+		txs[toClassify.ID] = domain.TransactionToClassify{
+			ID:        toClassify.ID,
+			Date:      toClassify.Date,
+			Payee:     toClassify.Payee,
+			PostingID: toClassify.PostingID,
+			AccountID: toClassify.AccountID,
+			Account:   toClassify.Account,
+			Amount:    toClassify.Amount,
+			Currency:  toClassify.Currency,
+		}
+	}
+
+	return txs, nil
+}
+
+func (t *Transaction) Save(ctx context.Context, transactions []domain.Transaction) error {
+	ctx, span := t.tracer.Start(ctx, "Transaction.Save")
 	defer span.End()
 
 	node, _ := snowflake.NewNode(1)
@@ -135,11 +218,11 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 		}
 	}
 
-	tx, errBegin := s.pool.Begin(context.WithValue(ctx, SQLName, "begin transaction"))
+	tx, errBegin := t.pool.Begin(context.WithValue(ctx, SQLName, "begin transaction"))
 
 	if errBegin != nil {
 		return oops.
-			In("Transaction").
+			In("postgres.transaction").
 			WithContext(ctx).
 			Wrapf(errBegin, "failed to begin transaction")
 	}
@@ -198,7 +281,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	)
 	if errCopyTr != nil {
 		return oops.
-			In("Transaction").
+			In("postgres.transaction").
 			WithContext(ctx).
 			Wrapf(errCopyTr, "failed to exec copy transaction")
 	}
@@ -210,7 +293,7 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	)
 	if errCopyPosting != nil {
 		return oops.
-			In("Transaction").
+			In("postgres.transaction").
 			WithContext(ctx).
 			Wrapf(errCopyPosting, "failed to exec copy posting")
 	}
@@ -252,10 +335,32 @@ func (s *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	errCmt := tx.Commit(context.WithValue(ctx, SQLName, "commit transaction"))
 	if errCmt != nil {
 		return oops.
-			In("Transaction").
+			In("postgres.transaction").
 			WithContext(ctx).
 			Wrapf(errCmt, "failed to commit data")
 	}
 
 	return nil
+}
+
+func (t *Transaction) GetTotal(ctx context.Context) (int, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetTotal")
+	defer span.End()
+
+	var total int
+
+	row := t.pool.QueryRow(
+		context.WithValue(ctx, SQLName, "get total transactions"),
+		`SELECT COUNT(*) FROM transaction`,
+	)
+
+	errScan := row.Scan(&total)
+	if errScan != nil {
+		return 0, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errScan, "failed to scan transaction")
+	}
+
+	return total, nil
 }

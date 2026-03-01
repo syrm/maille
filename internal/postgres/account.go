@@ -6,8 +6,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
-	"github.com/syrm/maille/internal/domain"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/syrm/maille/internal/domain"
 )
 
 type Account struct {
@@ -15,7 +16,7 @@ type Account struct {
 	tracer trace.Tracer
 }
 
-func BuildAccount(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) *Account {
+func BuildAccount(pool *pgxpool.Pool, tracer trace.Tracer) *Account {
 	return &Account{
 		pool:   pool,
 		tracer: tracer,
@@ -23,7 +24,7 @@ func BuildAccount(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) 
 }
 
 func (a *Account) GetAll(ctx context.Context) ([]domain.Account, error) {
-	ctx, span := a.tracer.Start(ctx, "GetAll")
+	ctx, span := a.tracer.Start(ctx, "Account.GetAllWithPosting")
 	defer span.End()
 
 	rows, errQuery := a.pool.Query(
@@ -50,8 +51,6 @@ func (a *Account) GetAll(ctx context.Context) ([]domain.Account, error) {
 				With("row", row).
 				Wrapf(errScan, "failed to scan account")
 		}
-
-		account.Type = domain.AccountType(account.Type)
 
 		if !account.Type.IsValid() {
 			return account, oops.

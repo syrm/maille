@@ -79,11 +79,12 @@ func run(
 		return err
 	}
 
-	txStore := postgres.BuildTransaction(ctx, pool, tracerProvider.GetTracer("postgres.transaction"))
-	accountStore := postgres.BuildAccount(ctx, pool, tracerProvider.GetTracer("postgres.account"))
-	bankAccountStore := postgres.BuildBankAccount(ctx, pool, tracerProvider.GetTracer("postgres.bankaccount"))
-	currencyStore := postgres.BuildCurrency(ctx, pool, tracerProvider.GetTracer("postgres.currency"))
+	txStore := postgres.BuildTransaction(pool, tracerProvider.GetTracer("postgres.transaction"))
+	accountStore := postgres.BuildAccount(pool, tracerProvider.GetTracer("postgres.account"))
+	bankAccountStore := postgres.BuildBankAccount(pool, tracerProvider.GetTracer("postgres.bankaccount"))
+	currencyStore := postgres.BuildCurrency(pool, tracerProvider.GetTracer("postgres.currency"))
 	txClassifierRuleStore := postgres.BuildTransactionClassifierRule(ctx, pool, tracerProvider.GetTracer("postgres.transactionclassifierrule"))
+	postingStore := postgres.BuildPosting(pool, tracerProvider.GetTracer("postgres.posting"))
 
 	parser := ofx.Parser{
 		Tracer: tracerProvider.GetTracer("ofx.Parser"),
@@ -100,22 +101,31 @@ func run(
 	}
 
 	classifier := internal.Classifier{
-		TransactionProvider: txStore,
-		RuleProvider:        txClassifierRuleStore,
-		AccountProvider:     accountStore,
-		Tracer:              tracerProvider.GetTracer("classifier"),
-		Logger:              logger,
+		TransactionProvider:   txStore,
+		RuleProvider:          txClassifierRuleStore,
+		AccountProvider:       accountStore,
+		PostingAccountUpdater: postingStore,
+		Tracer:                tracerProvider.GetTracer("classifier"),
+		Logger:                logger,
+	}
+
+	reporter := internal.Reporter{
+		TransactionStatsProvider: txStore,
+		Logger:                   logger,
 	}
 
 	upload := web.Upload{
 		AccountStore:     accountStore,
 		TransactionStore: txStore,
-		// TransactionClassifierRuleStore: txClassifierRuleStore,
-		Importer:   importer,
-		Classifier: classifier,
-		Engine:     engine,
-		Tracer:     tracerProvider.GetTracer("maille-web"),
-		Logger:     logger,
+		Importer:         importer,
+		Classifier:       classifier,
+		Engine:           engine,
+		Tracer:           tracerProvider.GetTracer("maille-web"),
+		Logger:           logger,
+	}
+
+	stats := web.Stats{
+		Reporter: reporter,
 	}
 
 	r := chi.NewRouter()
@@ -123,7 +133,13 @@ func run(
 		otelchi.Middleware("maille", otelchi.WithChiRoutes(r)),
 	)
 	r.Use(middleware.Recoverer)
-	r.Mount("/", upload.Router())
+	r.Mount("/upload", upload.Router())
+	r.Mount("/stats", stats.Router())
+
+	staticFS := http.FileServer(http.Dir("./frontend/dist"))
+	r.Handle("/assets/*", http.StripPrefix("/assets/", staticFS))
+
+	r.Handle("/*", staticFS)
 
 	logger.InfoContext(ctx, "launch web server", slog.Any("port", 13000))
 

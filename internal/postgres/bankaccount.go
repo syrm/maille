@@ -6,8 +6,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
-	"github.com/syrm/maille/internal/domain"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/syrm/maille/internal/domain"
 )
 
 type BankAccount struct {
@@ -15,7 +16,7 @@ type BankAccount struct {
 	tracer trace.Tracer
 }
 
-func BuildBankAccount(ctx context.Context, pool *pgxpool.Pool, tracer trace.Tracer) *BankAccount {
+func BuildBankAccount(pool *pgxpool.Pool, tracer trace.Tracer) *BankAccount {
 	return &BankAccount{
 		pool:   pool,
 		tracer: tracer,
@@ -23,7 +24,7 @@ func BuildBankAccount(ctx context.Context, pool *pgxpool.Pool, tracer trace.Trac
 }
 
 func (a *BankAccount) GetAll(ctx context.Context) ([]domain.BankAccount, error) {
-	ctx, span := a.tracer.Start(ctx, "GetAll")
+	ctx, span := a.tracer.Start(ctx, "BankAccount.GetAllWithPosting")
 	defer span.End()
 
 	rows, errQuery := a.pool.Query(
@@ -35,7 +36,7 @@ func (a *BankAccount) GetAll(ctx context.Context) ([]domain.BankAccount, error) 
 		return []domain.BankAccount{}, oops.
 			In("postgres.bankaccount").
 			WithContext(ctx).
-			Wrapf(errQuery, "failed to get bankaccounts")
+			Wrapf(errQuery, "failed to get bankAccounts")
 	}
 	defer rows.Close()
 
@@ -48,7 +49,7 @@ func (a *BankAccount) GetAll(ctx context.Context) ([]domain.BankAccount, error) 
 				In("postgres.bankaccount").
 				WithContext(ctx).
 				With("row", row).
-				Wrapf(errScan, "failed to scan bankaccount")
+				Wrapf(errScan, "failed to scan bankAccount")
 		}
 
 		return bankAccount, nil

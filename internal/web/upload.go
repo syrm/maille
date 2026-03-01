@@ -9,13 +9,13 @@ import (
 	"github.com/abiosoft/mold"
 	"github.com/expr-lang/expr"
 	"github.com/go-chi/chi/v5"
-	"github.com/syrm/maille/internal"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/syrm/maille/internal"
 )
 
 type PostingEvalCtx struct {
 	Payee     string       `expr:"payee"`
-	Narration string       `expr:"narration"`
 	Date      time.Time    `expr:"date"`
 	DayOfWeek time.Weekday `expr:"day_of_week"`
 	Month     int          `expr:"month"`
@@ -38,14 +38,15 @@ type Upload struct {
 
 func (u Upload) Router() *chi.Mux {
 	r := chi.NewRouter()
-	r.Get("/upload", u.Get)
-	r.Post("/upload", u.Post)
+	r.Get("/", u.Get)
+	r.Post("/", u.Post)
 	r.Get("/transaction-classifier", u.GetTransactionClassifier)
 
 	return r
 }
 
 func (u Upload) GetTransactionClassifier(w http.ResponseWriter, r *http.Request) {
+	// OLD SYSTEM
 	ctx := r.Context()
 
 	accountsID := make(map[uint64]string)
@@ -64,7 +65,7 @@ func (u Upload) GetTransactionClassifier(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	transactions, e := u.TransactionStore.GetAll(r.Context(), 0, 1000)
+	transactions, e := u.TransactionStore.GetAllToClassify(r.Context(), 0, 1000)
 
 	if e != nil {
 		println(e.Error())
@@ -73,29 +74,15 @@ func (u Upload) GetTransactionClassifier(w http.ResponseWriter, r *http.Request)
 	postingEvalCtx := make([]PostingEvalCtx, 0, len(transactions))
 
 	for _, transaction := range transactions {
-		accountName, ok := accountsID[transaction.Postings[0].AccountID]
-
-		if !ok {
-			fmt.Println("accountID pas ok")
-			continue
-		}
-
-		narration := ""
-
-		if transaction.Narration != nil {
-			narration = *transaction.Narration
-		}
-
 		postingEvalCtx = append(postingEvalCtx, PostingEvalCtx{
 			Payee:       transaction.Payee,
-			Narration:   narration,
 			Date:        transaction.Date,
 			DayOfWeek:   transaction.Date.Weekday(),
 			Month:       int(transaction.Date.Month()),
 			Year:        transaction.Date.Year(),
-			Amount:      transaction.Postings[0].Amount,
-			Currency:    transaction.Postings[0].Currency.Name,
-			AccountName: accountName,
+			Amount:      transaction.Amount,
+			Currency:    transaction.Currency,
+			AccountName: transaction.Account,
 		})
 	}
 
@@ -193,13 +180,13 @@ func (u Upload) Post(w http.ResponseWriter, r *http.Request) {
 		// @TODO redirection
 	}
 
-	// errImport := u.Importer.Import(ctx, file)
-	// if errImport != nil {
-	// 	u.Logger.ErrorContext(r.Context(), "failed to import file", slog.Any("error", errImport))
-	// 	w.Write([]byte("Good 5"))
-	// 	return
-	// 	// @TODO redirection
-	// }
+	errImport := u.Importer.Import(ctx, file)
+	if errImport != nil {
+		u.Logger.ErrorContext(r.Context(), "failed to import file", slog.Any("error", errImport))
+		w.Write([]byte("Good 5"))
+		return
+		// @TODO redirection
+	}
 
 	errClass := u.Classifier.Classify(ctx)
 	if errClass != nil {
