@@ -2,18 +2,20 @@ package main
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 
-	"github.com/abiosoft/mold"
+	"github.com/CloudyKit/jet/v6"
+	"github.com/CloudyKit/jet/v6/loaders/httpfs"
+	pkgcurrency "github.com/bojanz/currency"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/gops/agent"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riandyrn/otelchi"
 	"github.com/samber/oops"
-
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	sdkresource "go.opentelemetry.io/otel/sdk/resource"
@@ -22,6 +24,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/syrm/maille/internal"
+	maillemiddleware "github.com/syrm/maille/internal/middleware"
 	"github.com/syrm/maille/internal/ofx"
 	"github.com/syrm/maille/internal/postgres"
 	"github.com/syrm/maille/internal/web"
@@ -49,12 +52,6 @@ func run(
 	getenv func(string) string,
 	logger *slog.Logger,
 ) error {
-	engine, errMold := mold.New(web.TemplateFS)
-	if errMold != nil {
-		logger.ErrorContext(ctx, "failed to create template engine", slog.Any("error", errMold))
-		os.Exit(1)
-	}
-
 	tracerProvider, res, err := BuildTracerProvider(getenv("TRACING_ENDPOINT"))
 	_ = res
 	if err != nil {
@@ -77,6 +74,20 @@ func run(
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return err
+	}
+
+	sub, _ := fs.Sub(web.TemplateFS, "template")
+	loader, _ := httpfs.NewLoader(http.FS(sub))
+	views := jet.NewSet(loader)
+	views.AddGlobal("formatMoney", func(amount pkgcurrency.Amount, lang string) string {
+		locale := pkgcurrency.NewLocale(lang)
+		formatter := pkgcurrency.NewFormatter(locale)
+		formatter.MaxDigits = 0
+		return formatter.Format(amount)
+	})
+
+	renderer := web.Renderer{
+		Views: views,
 	}
 
 	txStore := postgres.BuildTransaction(pool, tracerProvider.GetTracer("postgres.transaction"))
@@ -115,11 +126,11 @@ func run(
 	}
 
 	upload := web.Upload{
+		Renderer:         renderer,
 		AccountStore:     accountStore,
 		TransactionStore: txStore,
 		Importer:         importer,
 		Classifier:       classifier,
-		Engine:           engine,
 		Tracer:           tracerProvider.GetTracer("maille-web"),
 		Logger:           logger,
 	}
@@ -128,18 +139,25 @@ func run(
 		Reporter: reporter,
 	}
 
+	dashboard := web.Dashboard{
+		Renderer: renderer,
+		Reporter: reporter,
+		Tracer:   tracerProvider.GetTracer("maille-web"),
+		Logger:   logger,
+	}
+
 	r := chi.NewRouter()
 	r.Use(
 		otelchi.Middleware("maille", otelchi.WithChiRoutes(r)),
 	)
 	r.Use(middleware.Recoverer)
+	r.Use(maillemiddleware.Language)
+	r.Mount("/", dashboard.Router())
 	r.Mount("/upload", upload.Router())
 	r.Mount("/stats", stats.Router())
 
-	staticFS := http.FileServer(http.Dir("./frontend/dist"))
+	staticFS := http.FileServer(http.Dir("./internal/web/dist"))
 	r.Handle("/assets/*", http.StripPrefix("/assets/", staticFS))
-
-	r.Handle("/*", staticFS)
 
 	logger.InfoContext(ctx, "launch web server", slog.Any("port", 13000))
 

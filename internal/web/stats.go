@@ -8,15 +8,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/syrm/maille/internal/domain"
+	"github.com/syrm/maille/internal/domain/api"
 )
 
-type Reporter interface {
-	Report(context.Context) domain.Stats
+type reporterStats interface {
+	BalanceSummaryAPI(context.Context) api.BalanceSummary
+	RecentTransactions(context.Context) []api.Transaction
 }
 
 type Stats struct {
-	Reporter Reporter
+	Reporter reporterStats
 }
 
 func (s Stats) Router() *chi.Mux {
@@ -27,10 +28,17 @@ func (s Stats) Router() *chi.Mux {
 }
 
 func (s Stats) Get(w http.ResponseWriter, r *http.Request) {
-	stats := s.Reporter.Report(r.Context())
+	balanceSummary := s.Reporter.BalanceSummaryAPI(r.Context())
+	recentTransactions := s.Reporter.RecentTransactions(r.Context())
+
+	dashboard := api.Dashboard{
+		BalanceSummary:     balanceSummary,
+		RecentTransactions: recentTransactions,
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(stats); err != nil {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if err := json.NewEncoder(w).Encode(dashboard); err != nil {
 		slog.Error("failed to encode response", "err", err)
 	}
 }

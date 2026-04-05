@@ -1,3 +1,6 @@
+[tools]
+node = "24"
+
 [env]
 DATABASE_URL = "postgres://postgres:@localhost:5432/maille"
 TRACING_ENDPOINT="docker-monitoring-collector.docker-monitoring_public:4317"
@@ -13,6 +16,14 @@ run = '''#!/usr/bin/elvish
 
 [tasks.build]
 run = "podman build --layers -t localhost/maille-dev:latest -f deploy/Containerfile.dev ."
+
+[tasks.build-front]
+dir = "frontend"
+run = "gleam run -m lustre/dev build"
+
+[tasks.watch-front]
+dir = "frontend"
+run = "find src -name '*.gleam' | entr gleam run -m lustre/dev build"
 
 [tasks.deploy-network]
 run = "podman network create maille-network"

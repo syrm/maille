@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abiosoft/mold"
 	"github.com/expr-lang/expr"
 	"github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/otel/trace"
@@ -27,11 +26,11 @@ type PostingEvalCtx struct {
 }
 
 type Upload struct {
+	Renderer         Renderer
 	AccountStore     internal.AccountStore
 	TransactionStore internal.TransactionStore
 	Importer         internal.Importer
 	Classifier       internal.Classifier
-	Engine           mold.Engine
 	Tracer           trace.Tracer
 	Logger           *slog.Logger
 }
@@ -143,10 +142,8 @@ func (u Upload) GetTransactionClassifier(w http.ResponseWriter, r *http.Request)
 }
 
 func (u Upload) Get(w http.ResponseWriter, r *http.Request) {
-	errRender := u.Engine.Render(w, "template/upload.html", nil)
-
-	if errRender != nil {
-		u.Logger.ErrorContext(r.Context(), "failed to render", slog.Any("error", errRender))
+	if err := u.Renderer.Render(w, "upload", nil); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 

@@ -1,3 +1,14 @@
 tmp
 demo.ofx
 .test
+frontend/microchart/lib
+frontend/microchart-ts
+frontend/preact
+frontend/react
+frontend/solidjs
+frontend/sveltekit
+frontend/rescript/lib
+.test
+node_modules
+*.mjs
+*.min.js
