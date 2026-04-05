@@ -1,0 +1,17 @@
+name = "maille"
+version = "1.0.0"
+target = "javascript"
+
+[tools.lustre.build]
+minify = true
+outdir = "./dist"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+lustre = ">= 5.6.0 and < 6.0.0"
+gleam_http = ">= 4.3.0 and < 5.0.0"
+gleam_json = ">= 3.1.0 and < 4.0.0"
+rsvp = ">= 1.2.0 and < 2.0.0"
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.3.4 and < 3.0.0"
