@@ -5,10 +5,15 @@ import (
 	"log/slog"
 
 	"github.com/syrm/maille/internal/domain"
+	"github.com/syrm/maille/internal/domain/api"
 )
 
+const recentTransactionsLimit = 6
+
 type TransactionStatsProvider interface {
-	GetTotal(context.Context) (int, error)
+	GetCheckingBalance(context.Context) (int64, error)
+	GetRecentTransactions(context.Context, uint) ([]api.Transaction, error)
+	BalanceSummary(ctx context.Context) (domain.BalanceSummary, error)
 }
 
 type Reporter struct {
@@ -16,15 +21,38 @@ type Reporter struct {
 	Logger                   *slog.Logger
 }
 
-func (r Reporter) Report(ctx context.Context) domain.Stats {
-	total, err := r.TransactionStatsProvider.GetTotal(ctx)
+func (r Reporter) BalanceSummary(ctx context.Context) domain.BalanceSummary {
+	balanceSummary, err := r.TransactionStatsProvider.BalanceSummary(ctx)
 
 	if err != nil {
-		r.Logger.ErrorContext(ctx, "failed to get total", slog.Any("error", err))
-		return domain.Stats{}
+		r.Logger.ErrorContext(ctx, "failed to get balance summary", slog.Any("error", err))
+		return domain.BalanceSummary{}
 	}
 
-	return domain.Stats{
-		TotalTransaction: total,
+	return balanceSummary
+}
+
+func (r Reporter) BalanceSummaryAPI(ctx context.Context) api.BalanceSummary {
+	checkingBalance, err := r.TransactionStatsProvider.GetCheckingBalance(ctx)
+
+	if err != nil {
+		r.Logger.ErrorContext(ctx, "failed to get balance summary", slog.Any("error", err))
+		return api.BalanceSummary{}
 	}
+
+	return api.BalanceSummary{
+		TotalBalance:    checkingBalance,
+		CheckingBalance: checkingBalance,
+	}
+}
+
+func (r Reporter) RecentTransactions(ctx context.Context) []api.Transaction {
+	transactions, err := r.TransactionStatsProvider.GetRecentTransactions(ctx, recentTransactionsLimit)
+
+	if err != nil {
+		r.Logger.ErrorContext(ctx, "failed to get recent transaction", slog.Any("error", err))
+		return nil
+	}
+
+	return transactions
 }

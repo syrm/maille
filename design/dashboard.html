@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patrimoine — Tableau de bord</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<button class="mob-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">P</div>
+    <span class="logo-text">Patrimoine</span>
+  </div>
+  <nav>
+    <div class="nav-label">Principal</div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Tableau de bord
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4h-4z"/></svg>
+      Comptes
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Transactions
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+      Budgets
+    </div>
+    <div class="nav-label">Investissements</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Portefeuille
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      Performances
+    </div>
+    <div class="nav-label">Outils</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Paramètres
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar">AL</div>
+      <div>
+        <div class="user-name">Alex Lemoine</div>
+        <div class="user-email">alex@email.com</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="header anim d1">
+    <div>
+      <h1>Tableau de bord</h1>
+      <p>Dernière mise à jour : 6 février 2026, 14:32</p>
+    </div>
+    <div class="header-actions">
+      <div class="period-sel">
+        <button class="period-btn">7J</button>
+        <button class="period-btn active">1M</button>
+        <button class="period-btn">3M</button>
+        <button class="period-btn">1A</button>
+        <button class="period-btn">Max</button>
+      </div>
+      <button class="btn-icon" title="Exporter">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- SOLDES -->
+  <div class="balance-row anim d2">
+    <div class="card bal-card main-bal">
+      <div class="bal-label"><span class="dot" style="background:var(--green)"></span> Solde global</div>
+      <div class="bal-value">87 432,60 €</div>
+      <span class="badge up">↑ +3,2 % ce mois</span>
+    </div>
+    <div class="card bal-card">
+      <div class="bal-label"><span class="dot" style="background:var(--blue)"></span> Comptes courants</div>
+      <div class="bal-value">12 840,25 €</div>
+      <span class="badge up">↑ +540 €</span>
+    </div>
+    <div class="card bal-card">
+      <div class="bal-label"><span class="dot" style="background:var(--purple)"></span> Épargne</div>
+      <div class="bal-value">38 210,00 €</div>
+      <span class="badge up">↑ +1,1 %</span>
+    </div>
+    <div class="card bal-card">
+      <div class="bal-label"><span class="dot" style="background:var(--amber)"></span> Investissements</div>
+      <div class="bal-value">36 382,35 €</div>
+      <span class="badge down">↓ −0,8 %</span>
+    </div>
+  </div>
+
+  <!-- GRAPHE + RÉPARTITION côte à côte -->
+  <div class="row-2 anim d3">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Évolution du patrimoine</div>
+          <div class="card-sub">Solde global sur 12 mois</div>
+        </div>
+        <div class="legend-row" style="margin:0">
+          <div class="legend-tag"><span style="background:var(--green)"></span> Total</div>
+          <div class="legend-tag"><span style="background:var(--blue)"></span> Épargne</div>
+          <div class="legend-tag"><span style="background:var(--amber)"></span> Invest.</div>
+        </div>
+      </div>
+      <div class="chart-wrap" id="lineChart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Répartition par catégorie</div>
+          <div class="card-sub">Poids de chaque poche</div>
+        </div>
+      </div>
+      <div class="donut-wrap" id="donutChart"></div>
+    </div>
+  </div>
+
+  <!-- COMPTES + TRANSACTIONS + DÉPENSES -->
+  <div class="row-3 anim d4">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Mes comptes</div>
+          <div class="card-sub">6 comptes actifs</div>
+        </div>
+      </div>
+      <div id="acctList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Transactions récentes</div>
+          <div class="card-sub">Dernières opérations</div>
+        </div>
+      </div>
+      <div id="txList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Dépenses mensuelles</div>
+          <div class="card-sub">12 derniers mois</div>
+        </div>
+      </div>
+      <div class="bars" id="barChart"></div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px">Top catégories dépenses</div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Ce mois</div>
+        <div id="topCats"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="tip" id="tip">
+  <div class="tip-t"></div>
+  <div class="tip-v"></div>
+</div>
+
+<script>
+const mois = ['Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc','Jan','Fév'];
+const totalD = [72100,73500,74800,76200,78100,79500,80200,81400,83100,84700,86200,87432];
+const eparD  = [32000,32500,33100,33800,34500,35200,35800,36300,37000,37400,37800,38210];
+const investD= [28500,29200,29800,30400,31600,32300,32400,33100,34000,35200,36300,36382];
+
+const cats = [
+  { nom:'Livret A', val:22800, color:'var(--green)', pct:'26,1 %' },
+  { nom:'PEA Actions', val:21400, color:'var(--amber)', pct:'24,5 %' },
+  { nom:'Assurance Vie', val:15410, color:'var(--purple)', pct:'17,6 %' },
+  { nom:'Compte courant', val:12840, color:'var(--blue)', pct:'14,7 %' },
+  { nom:'LEP', val:9972, color:'var(--cyan)', pct:'11,4 %' },
+  { nom:'Crypto', val:5010, color:'var(--pink)', pct:'5,7 %' },
+];
+
+const comptes = [
+  { nom:'Compte courant BNP', type:'Courant', amt:'8 240,25 €', pct:'9,4 %', icon:'🏦', bg:'var(--blue-bg)' },
+  { nom:'Livret A', type:'Épargne réglementée', amt:'22 800,00 €', pct:'26,1 %', icon:'🐖', bg:'var(--green-bg)' },
+  { nom:'PEA Boursorama', type:'Actions & ETF', amt:'21 400,35 €', pct:'24,5 %', icon:'📈', bg:'var(--amber-bg)' },
+  { nom:'Assurance Vie Linxea', type:'Fonds euros + UC', amt:'15 410,00 €', pct:'17,6 %', icon:'🛡️', bg:'var(--purple-bg)' },
+  { nom:'LEP', type:'Épargne réglementée', amt:'9 972,00 €', pct:'11,4 %', icon:'💎', bg:'var(--cyan-bg)' },
+  { nom:'Ledger Nano', type:'Crypto BTC/ETH', amt:'5 010,00 €', pct:'5,7 %', icon:'₿', bg:'var(--pink-bg)' },
+];
+
+const txs = [
+  { nom:'Salaire Février', cat:'Revenus · Virement', amt:'+2 850,00 €', date:'5 fév.', cls:'inc', icon:'💰', bg:'var(--green-bg)' },
+  { nom:'Loyer', cat:'Logement · Prélèvement', amt:'−780,00 €', date:'5 fév.', cls:'exp', icon:'🏠', bg:'var(--red-bg)' },
+  { nom:'Carrefour', cat:'Alimentation · CB', amt:'−67,42 €', date:'4 fév.', cls:'exp', icon:'🛒', bg:'var(--amber-bg)' },
+  { nom:'Spotify Premium', cat:'Loisirs · Prélèvement', amt:'−10,99 €', date:'3 fév.', cls:'exp', icon:'🎵', bg:'var(--purple-bg)' },
+  { nom:'SNCF', cat:'Transport · CB', amt:'−45,00 €', date:'2 fév.', cls:'exp', icon:'🚄', bg:'var(--blue-bg)' },
+  { nom:'Virement PEA', cat:'Investissement · Virement', amt:'−300,00 €', date:'1 fév.', cls:'exp', icon:'📊', bg:'var(--cyan-bg)' },
+];
+
+const depMois = [2100,1950,2300,2150,1890,2400,2050,2200,1980,2350,2100,1680];
+
+const topCats = [
+  { nom:'Logement', val:780, max:780, color:'var(--red)', pct:'46,4 %' },
+  { nom:'Investissement', val:300, max:780, color:'var(--cyan)', pct:'17,9 %' },
+  { nom:'Alimentation', val:267, max:780, color:'var(--amber)', pct:'15,9 %' },
+  { nom:'Transport', val:145, max:780, color:'var(--blue)', pct:'8,6 %' },
+  { nom:'Loisirs', val:110, max:780, color:'var(--purple)', pct:'6,5 %' },
+  { nom:'Divers', val:78, max:780, color:'var(--text-3)', pct:'4,6 %' },
+];
+
+// ─── TOOLTIP ───
+const tip = document.getElementById('tip');
+function showT(e,t,v){
+  tip.querySelector('.tip-t').textContent=t;
+  tip.querySelector('.tip-v').textContent=v;
+  tip.style.left=(e.clientX+12)+'px';
+  tip.style.top=(e.clientY-36)+'px';
+  tip.classList.add('on');
+}
+function hideT(){ tip.classList.remove('on'); }
+
+// ─── GRAPHE ───
+function drawLine(){
+  const c=document.getElementById('lineChart');
+  const W=c.clientWidth,H=c.clientHeight;
+  const p={t:8,r:16,b:24,l:48};
+  const cw=W-p.l-p.r,ch=H-p.t-p.b;
+  const all=[...totalD,...eparD,...investD];
+  const mn=Math.min(...all)*.95,mx=Math.max(...all)*1.02;
+  const xp=i=>p.l+(i/(mois.length-1))*cw;
+  const yp=v=>p.t+(1-(v-mn)/(mx-mn))*ch;
+
+  let s=`<svg viewBox="0 0 ${W} ${H}">`;
+  for(let i=0;i<=4;i++){
+    const yy=p.t+(i/4)*ch,val=mx-(i/4)*(mx-mn);
+    s+=`<line x1="${p.l}" y1="${yy}" x2="${W-p.r}" y2="${yy}" class="grid-ln"/>`;
+    s+=`<text x="${p.l-6}" y="${yy+3}" text-anchor="end" class="ax-label">${(val/1000).toFixed(0)}k</text>`;
+  }
+  mois.forEach((m,i)=>{s+=`<text x="${xp(i)}" y="${H-4}" text-anchor="middle" class="ax-label">${m}</text>`;});
+
+  function series(data,col){
+    const pts=data.map((v,i)=>`${xp(i).toFixed(1)},${yp(v).toFixed(1)}`);
+    const path=pts.map((p,i)=>(i?'L':'M')+p).join(' ');
+    s+=`<path d="${path} L${xp(data.length-1).toFixed(1)},${yp(mn).toFixed(1)} L${xp(0).toFixed(1)},${yp(mn).toFixed(1)} Z" fill="${col}" class="area"/>`;
+    s+=`<path d="${path}" stroke="${col}" class="line"/>`;
+    data.forEach((v,i)=>{
+      s+=`<circle cx="${xp(i).toFixed(1)}" cy="${yp(v).toFixed(1)}" r="3.5" fill="var(--bg)" stroke="${col}" class="dot"
+        onmouseenter="showT(event,'${mois[i]}','${v.toLocaleString('fr-FR')} €')"
+        onmousemove="showT(event,'${mois[i]}','${v.toLocaleString('fr-FR')} €')"
+        onmouseleave="hideT()"/>`;
+    });
+  }
+  series(investD,'var(--amber)');
+  series(eparD,'var(--blue)');
+  series(totalD,'var(--green)');
+  s+='</svg>';
+  c.innerHTML=s;
+}
+
+// ─── DONUT ───
+function drawDonut(){
+  const el=document.getElementById('donutChart');
+  const total=cats.reduce((s,c)=>s+c.val,0);
+  const cx=80,cy=80,R=70,r=46;
+  let ang=-90;
+  let svg=`<svg class="donut-svg" viewBox="0 0 160 160">`;
+  cats.forEach(cat=>{
+    const pct=cat.val/total;
+    const a1=ang*Math.PI/180;ang+=pct*360;const a2=ang*Math.PI/180;
+    const lg=pct>.5?1:0;
+    const x1o=cx+R*Math.cos(a1),y1o=cy+R*Math.sin(a1);
+    const x2o=cx+R*Math.cos(a2),y2o=cy+R*Math.sin(a2);
+    const x1i=cx+r*Math.cos(a2),y1i=cy+r*Math.sin(a2);
+    const x2i=cx+r*Math.cos(a1),y2i=cy+r*Math.sin(a1);
+    svg+=`<path d="M${x1o},${y1o} A${R},${R} 0 ${lg} 1 ${x2o},${y2o} L${x1i},${y1i} A${r},${r} 0 ${lg} 0 ${x2i},${y2i} Z"
+      fill="${cat.color}" opacity=".8" style="cursor:pointer;transition:opacity .15s"
+      onmouseenter="this.style.opacity=1;showT(event,'${cat.nom}','${cat.val.toLocaleString('fr-FR')} €')"
+      onmousemove="showT(event,'${cat.nom}','${cat.val.toLocaleString('fr-FR')} €')"
+      onmouseleave="this.style.opacity=.8;hideT()"/>`;
+  });
+  svg+=`<text x="${cx}" y="${cy-2}" text-anchor="middle" class="donut-center">87 432 €</text>`;
+  svg+=`<text x="${cx}" y="${cy+12}" text-anchor="middle" class="donut-center-sub">Total</text>`;
+  svg+='</svg>';
+
+  let leg='<div class="donut-legend">';
+  cats.forEach(c=>{
+    leg+=`<div class="dl-item">
+      <div class="dl-dot" style="background:${c.color}"></div>
+      <span class="dl-name">${c.nom}</span>
+      <span class="dl-val">${c.val.toLocaleString('fr-FR')} €</span>
+      <span class="dl-pct">${c.pct}</span>
+    </div>`;
+  });
+  leg+='</div>';
+  el.innerHTML=svg+leg;
+}
+
+// ─── COMPTES ───
+document.getElementById('acctList').innerHTML=comptes.map(a=>`
+  <div class="acct-item">
+    <div class="acct-icon" style="background:${a.bg}">${a.icon}</div>
+    <div><div class="acct-name">${a.nom}</div><div class="acct-type">${a.type}</div></div>
+    <div class="acct-right"><div class="acct-amt">${a.amt}</div><div class="acct-pct">${a.pct}</div></div>
+  </div>`).join('');
+
+// ─── TRANSACTIONS ───
+document.getElementById('txList').innerHTML=txs.map(t=>`
+  <div class="tx-item">
+    <div class="tx-icon" style="background:${t.bg}">${t.icon}</div>
+    <div><div class="tx-name">${t.nom}</div><div class="tx-cat">${t.cat}</div></div>
+    <div class="tx-right"><div class="tx-amt ${t.cls}">${t.amt}</div><div class="tx-date">${t.date}</div></div>
+  </div>`).join('');
+
+// ─── BARRES ───
+const maxDep=Math.max(...depMois);
+document.getElementById('barChart').innerHTML=mois.map((m,i)=>{
+  const h=(depMois[i]/maxDep)*90;
+  const col=i===mois.length-1?'var(--green)':'var(--surface-3)';
+  return `<div class="bar-col">
+    <div class="bar" style="height:${h}px;background:${col}"
+      onmouseenter="showT(event,'${m}','${depMois[i].toLocaleString('fr-FR')} €')"
+      onmousemove="showT(event,'${m}','${depMois[i].toLocaleString('fr-FR')} €')"
+      onmouseleave="hideT()"></div>
+    <span class="bar-lbl">${m.substring(0,1)}</span>
+  </div>`;
+}).join('');
+
+// ─── TOP CATÉGORIES ───
+document.getElementById('topCats').innerHTML=topCats.map(c=>`
+  <div style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <span style="font-weight:500">${c.nom}</span>
+      <span style="color:var(--text-2);font-family:'JetBrains Mono',monospace;font-size:11px">${c.val} € <span style="color:var(--text-3)">${c.pct}</span></span>
+    </div>
+    <div style="height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden">
+      <div style="height:100%;width:${(c.val/c.max)*100}%;background:${c.color};border-radius:3px"></div>
+    </div>
+  </div>`).join('');
+
+// ─── PÉRIODE ───
+document.querySelectorAll('.period-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.period-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
+
+drawLine();
+drawDonut();
+window.addEventListener('resize',drawLine);
+</script>
+</body>
+</html>

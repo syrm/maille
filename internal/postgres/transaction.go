@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/bojanz/currency"
 	"github.com/bwmarrin/snowflake"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/syrm/maille/internal/domain"
+	"github.com/syrm/maille/internal/domain/api"
 	"github.com/syrm/maille/internal/postgres/dto"
 )
 
@@ -145,17 +148,6 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 			Wrapf(errQuery, "failed to get transactions to classify")
 	}
 
-	//var (
-	//	id           uint64
-	//	date         time.Time
-	//	payee        string
-	//	accountName  string
-	//	narration    *string
-	//	accountID    uint64
-	//	amount       float64
-	//	currencyName string
-	//)
-
 	dtos, err := pgx.CollectRows(rows, pgx.RowToStructByName[dto.TransactionToClassify])
 
 	if err != nil {
@@ -177,6 +169,63 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 			Currency:  toClassify.Currency,
 		}
 	}
+
+	return txs, nil
+}
+
+func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]api.Transaction, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetRecent")
+	defer span.End()
+
+	txs := make([]api.Transaction, 0, size)
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "get recent transactions"),
+		`SELECT date,
+       narration,
+       (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
+       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
+       (ARRAY_AGG(currency.name ORDER BY posting.id))[1] as currency
+		FROM transaction
+		INNER JOIN posting ON (posting.transaction_id = transaction.id)
+		INNER JOIN currency ON (currency.id = posting.currency_id)
+		INNER JOIN account ON (account.id = posting.account_id)
+		GROUP BY transaction.id
+		ORDER BY transaction.id DESC
+		LIMIT @size`,
+		pgx.NamedArgs{
+			"size": size,
+		})
+
+	if errQuery != nil {
+		fmt.Printf("err %+v\n", errQuery)
+
+		return nil, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get recent transactions")
+	}
+
+	dtos, errCollect := pgx.CollectRows(rows, pgx.RowToStructByName[dto.RecentTransaction])
+
+	if errCollect != nil {
+		return nil, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errCollect, "failed to collect rows recent transactions")
+	}
+
+	for _, dbTransaction := range dtos {
+		txs = append(txs, api.Transaction{
+			Date:      dbTransaction.Date,
+			Narration: dbTransaction.Narration,
+			Account:   dbTransaction.Account,
+			Amount:    dbTransaction.Amount,
+			Currency:  dbTransaction.Currency,
+		})
+	}
+
+	println("boum", len(txs))
 
 	return txs, nil
 }
@@ -343,15 +392,17 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	return nil
 }
 
-func (t *Transaction) GetTotal(ctx context.Context) (int, error) {
-	ctx, span := t.tracer.Start(ctx, "Transaction.GetTotal")
+func (t *Transaction) GetCheckingBalance(ctx context.Context) (int64, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetCheckingBalance")
 	defer span.End()
 
-	var total int
+	var total int64
 
 	row := t.pool.QueryRow(
-		context.WithValue(ctx, SQLName, "get total transactions"),
-		`SELECT COUNT(*) FROM transaction`,
+		context.WithValue(ctx, SQLName, "get checkingBalance"),
+		`SELECT COALESCE(CAST(ROUND(SUM(amount)) AS bigint), 0) AS total
+		FROM posting
+		WHERE account_id IN (SELECT id FROM account WHERE type = 'Assets' AND name = 'Bank:Checking')`,
 	)
 
 	errScan := row.Scan(&total)
@@ -363,4 +414,99 @@ func (t *Transaction) GetTotal(ctx context.Context) (int, error) {
 	}
 
 	return total, nil
+}
+
+func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetCheckingBalance")
+	defer span.End()
+
+	var balanceSummary domain.BalanceSummary
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "get balanceSummary"),
+		`SELECT a.name, COALESCE(CAST(ROUND(SUM(amount)) AS bigint), 0) AS amount, currency.name
+		FROM account AS a
+		INNER JOIN posting ON posting.account_id = a.id
+		INNER JOIN currency ON currency.id = posting.currency_id
+		WHERE type = 'Assets' AND a.name IN ('Bank:Checking', 'Bank:Savings', 'Bank:Investment')
+		GROUP BY a.id, currency.id`,
+	)
+
+	if errQuery != nil {
+		return balanceSummary, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get balanceSummary")
+	}
+
+	var name string
+	var amount string
+	var currencyName string
+
+	totalAmount, _ := currency.NewAmount("0", "EUR")
+	balanceSummary.TotalBalance = totalAmount
+
+	_, errScan := pgx.ForEachRow(
+		rows,
+		[]any{&name, &amount, &currencyName},
+		func() error {
+			currencyAmount, errCurrency := currency.NewAmount(amount, currencyName)
+			if errCurrency != nil {
+				return oops.
+					In("postgres.transaction").
+					WithContext(ctx).
+					Wrapf(errCurrency, "failed to create currency amount for %s", name)
+			}
+
+			if name == "Bank:Checking" {
+				amountWithChecking, errAddChecking := balanceSummary.TotalBalance.Add(currencyAmount)
+				if errAddChecking != nil {
+					return oops.
+						In("postgres.transaction").
+						WithContext(ctx).
+						Wrapf(errAddChecking, "failed to add checking balance for %s", name)
+				}
+
+				balanceSummary.TotalBalance = amountWithChecking
+				balanceSummary.CheckingBalance = currencyAmount
+			}
+
+			if name == "Bank:Savings" {
+				amountWithSavings, errAddSavings := balanceSummary.TotalBalance.Add(currencyAmount)
+				if errAddSavings != nil {
+					return oops.
+						In("postgres.transaction").
+						WithContext(ctx).
+						Wrapf(errAddSavings, "failed to add savings balance for %s", name)
+				}
+
+				balanceSummary.TotalBalance = amountWithSavings
+				balanceSummary.SavingsBalance = currencyAmount
+			}
+
+			if name == "Bank:Investment" {
+				amountWithInvestment, errAddInvestment := balanceSummary.TotalBalance.Add(currencyAmount)
+				if errAddInvestment != nil {
+					return oops.
+						In("postgres.transaction").
+						WithContext(ctx).
+						Wrapf(errAddInvestment, "failed to add investment balance for %s", name)
+				}
+
+				balanceSummary.TotalBalance = amountWithInvestment
+				balanceSummary.InvestmentBalance = currencyAmount
+			}
+
+			return nil
+
+		})
+
+	if errScan != nil {
+		return balanceSummary, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errScan, "failed to scan transaction")
+	}
+
+	return balanceSummary, nil
 }

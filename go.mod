@@ -3,29 +3,35 @@ module github.com/syrm/maille
 go 1.26.0
 
 require (
-	github.com/abiosoft/mold v0.0.0-20250328135240-0a4c28cb836a
+	github.com/CloudyKit/jet/v6 v6.3.2
+	github.com/bwmarrin/snowflake v0.3.0
 	github.com/davecgh/go-spew v1.1.1
+	github.com/expr-lang/expr v1.17.8
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/gops v0.3.29
+	github.com/jackc/pgx/v5 v5.9.1
+	github.com/riandyrn/otelchi v0.12.2
+	github.com/samber/oops v1.21.0
+	go.opentelemetry.io/otel v1.43.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
 	go.opentelemetry.io/otel/sdk v1.43.0
-		github.com/bwmarrin/snowflake v0.3.0
-    	github.com/expr-lang/expr v1.17.8
-    	github.com/jackc/pgx/v5 v5.9.1
-    	github.com/riandyrn/otelchi v0.12.2
-    	github.com/samber/oops v1.21.0
-    	go.opentelemetry.io/otel v1.43.0
-    	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
-    	go.opentelemetry.io/otel/trace v1.43.0
+	go.opentelemetry.io/otel/trace v1.43.0
 )
 
 require (
+	github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53 // indirect
+	github.com/bojanz/currency v1.4.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
+	github.com/dejurin/humanizemoney v0.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/govalues/decimal v0.1.33 // indirect
+	github.com/govalues/money v0.2.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -49,11 +55,11 @@ require (
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	rsc.io/goversion v1.2.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
 )
