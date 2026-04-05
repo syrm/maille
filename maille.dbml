@@ -1,0 +1,116 @@
+enum account_type {
+	Assets
+	Liabilities
+	Expenses
+	Income
+	Equity
+}
+
+Table transaction [headercolor: #175e7a] {
+	id bigint [ pk, not null, unique ]
+	date date [ not null ]
+	completed boolean [ not null ]
+	payee text [ not null ]
+	narration text
+	external_id text [ not null ]
+	classified_at timestamp [ note: ''' bit 0: double entry valide
+ bit 1: catégorisé
+ bit 2: réconcilié''' ]
+	balanced_at timestamp
+	reconciled_at timestamp
+}
+
+Table posting [headercolor: #175e7a] {
+	id bigint [ pk, not null, unique ]
+	transaction_id bigint [ not null ]
+	account_id bigint [ not null, note: 'ENUM' ]
+	amount numeric [ not null ]
+	currency_id integer [ not null ]
+	origin_position_id integer [ note: 'position_id when we sold it' ]
+	price_amount numeric
+	price_currency_id integer
+	tcr_id integer
+}
+
+Table currency [headercolor: #175e7a] {
+	id integer [ pk, increment, not null, unique ]
+	name text [ not null, unique ]
+}
+
+Table position [headercolor: #175e7a] {
+	id bigint [ pk, increment, not null, unique ]
+	date date [ not null ]
+	posting_id bigint [ not null ]
+	number numeric [ not null ]
+	ticker_symbol_id integer [ not null ]
+	amount numeric [ not null ]
+	currency_id integer [ not null ]
+}
+
+Table ticker_symbol [headercolor: #175e7a] {
+	id integer [ pk, increment, not null, unique ]
+	name text [ not null, unique ]
+}
+
+Table transaction_classifier_rule [headercolor: #175e7a] {
+	id integer [ pk, increment, not null, unique ]
+	rule text [ not null ]
+	account_id bigint [ not null ]
+}
+
+Table account [headercolor: #175e7a] {
+	id bigint [ pk, increment, not null, unique ]
+	type account_type [ not null ]
+	name text [ not null ]
+}
+
+Table bank_account [headercolor: #175e7a] {
+	id bigint [ pk, increment, not null, unique ]
+	name text [ not null ]
+	account_id bigint [ not null ]
+	external_id text [ not null ]
+}
+
+Ref fk_position_unit_posting_id_posting {
+	position.posting_id > posting.id [ delete: no action, update: no action ]
+}
+
+Ref fk_posting_devise_id_devise {
+	posting.currency_id - currency.id [ delete: no action, update: no action ]
+}
+
+Ref fk_posting_transaction_id_transaction {
+	posting.transaction_id > transaction.id [ delete: no action, update: no action ]
+}
+
+Ref fk_position_unit_ticker_symbol_id_ticker_symbol {
+	position.ticker_symbol_id > ticker_symbol.id [ delete: no action, update: no action ]
+}
+
+Ref fk_posting_origin_position_id_position {
+	posting.origin_position_id > position.id [ delete: no action, update: no action ]
+}
+
+Ref fk_posting_price_currency_id_currency {
+	posting.price_currency_id > currency.id [ delete: no action, update: no action ]
+}
+
+Ref fk_position_currency_id_currency {
+	position.currency_id > currency.id [ delete: no action, update: no action ]
+}
+
+Ref fk_posting_tcr_id_transaction_classifier_rule {
+	posting.tcr_id > transaction_classifier_rule.id [ delete: no action, update: no action ]
+}
+
+Ref fk_posting_acount_id_account {
+	posting.account_id > account.id [ delete: no action, update: no action ]
+}
+
+Ref fk_transaction_classifier_rule_account_id_account {
+	transaction_classifier_rule.account_id > account.id [ delete: no action, update: no action ]
+}
+
+Ref fk_bank_account_account_id_account {
+	bank_account.account_id > account.id [ delete: no action, update: no action ]
+}

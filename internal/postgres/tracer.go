@@ -18,7 +18,7 @@ type SQLTracer struct {
 	Tracer trace.Tracer
 }
 
-func (s SQLTracer) TraceCopyFromStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceCopyFromStartData) context.Context {
+func (s SQLTracer) TraceCopyFromStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceCopyFromStartData) context.Context {
 	fmt.Printf("SQLTracer %+v\n", data)
 	name, _ := ctx.Value(SQLName).(string)
 
@@ -29,7 +29,7 @@ func (s SQLTracer) TraceCopyFromStart(ctx context.Context, conn *pgx.Conn, data 
 	return spanCtx
 }
 
-func (s SQLTracer) TraceCopyFromEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceCopyFromEndData) {
+func (s SQLTracer) TraceCopyFromEnd(ctx context.Context, _ *pgx.Conn, _ pgx.TraceCopyFromEndData) {
 	span := trace.SpanFromContext(ctx)
 	span.End()
 }
