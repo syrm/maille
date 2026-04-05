@@ -1,7 +1,10 @@
-{{define "head"}}
-<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
-{{end}}
+{{ extends "layout.jet" }}
 
+{{ block head() }}
+<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+{{ end }}
+
+{{ block body() }}
 <h1>Upload OFX 3</h1>
 <form method="post" enctype="multipart/form-data">
   <div>
@@ -12,4 +15,4 @@
     <button>Submit</button>
   </div>
 </form>
-Go
+{{ end }}
