@@ -36,5 +36,5 @@ func parseAcceptLanguage(r *http.Request) string {
 	//"fr-FR" → "fr"
 	//lang = strings.SplitN(lang, "-", 2)[0]
 
-	return strings.TrimSpace(strings.ToLower(lang))
+	return strings.TrimSpace(strings.Replace(lang, "-", "_", 1))
 }

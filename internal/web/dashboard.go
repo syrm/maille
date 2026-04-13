@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -35,6 +36,8 @@ func (d Dashboard) Router() *chi.Mux {
 func (d Dashboard) Get(w http.ResponseWriter, r *http.Request) {
 	balanceSummary := d.Reporter.BalanceSummary(r.Context())
 	recentTransactions := d.Reporter.RecentTransactions(r.Context())
+
+	println(fmt.Sprintf("%+v\n", recentTransactions))
 
 	variables := jet.VarMap{}
 	variables.Set("lang", r.Context().Value(middleware.LangKey))

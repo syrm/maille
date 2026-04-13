@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	pkgcurrency "github.com/bojanz/currency"
 	"github.com/expr-lang/expr"
 	"github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/otel/trace"
@@ -14,15 +15,14 @@ import (
 )
 
 type PostingEvalCtx struct {
-	Payee     string       `expr:"payee"`
-	Date      time.Time    `expr:"date"`
-	DayOfWeek time.Weekday `expr:"day_of_week"`
-	Month     int          `expr:"month"`
-	Year      int          `expr:"year"`
-
-	Amount      float64 `expr:"amount"`
-	Currency    string  `expr:"currency"`
-	AccountName string  `expr:"account"`
+	Payee       string             `expr:"payee"`
+	Date        time.Time          `expr:"date"`
+	DayOfWeek   time.Weekday       `expr:"day_of_week"`
+	Month       int                `expr:"month"`
+	Year        int                `expr:"year"`
+	Amount      pkgcurrency.Amount `expr:"amount"`
+	Currency    string             `expr:"currency"`
+	AccountName string             `expr:"account"`
 }
 
 type Upload struct {

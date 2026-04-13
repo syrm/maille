@@ -14,16 +14,12 @@ run = '''#!/usr/bin/elvish
   var a = (printf 'postgres://maille:'$E:usage_secret'@postgres:5432/maille' | base64 -w0); printf '{"database": "'$a'"}'"\n" | podman secret create --replace maille-database-url -
 '''
 
+[tasks.front]
+dir = "frontend/microchart"
+run = "npm run res:build"
+
 [tasks.build]
 run = "podman build --layers -t localhost/maille-dev:latest -f deploy/Containerfile.dev ."
-
-[tasks.build-front]
-dir = "frontend"
-run = "gleam run -m lustre/dev build"
-
-[tasks.watch-front]
-dir = "frontend"
-run = "find src -name '*.gleam' | entr gleam run -m lustre/dev build"
 
 [tasks.deploy-network]
 run = "podman network create maille-network"

@@ -24,21 +24,40 @@
 <div class="balance-row anim d2">
   <div class="card bal-card main-bal">
     <div class="bal-label"><span class="dot" style="background:var(--green)"></span> Solde global</div>
-    <div class="bal-value">{{ formatMoney(balanceSummary.TotalBalance, lang) }}</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.TotalBalance, lang, 0) }}</div>
     <span class="badge up">↑ ? % ce mois</span></div>
   <div class="card bal-card">
     <div class="bal-label"><span class="dot" style="background:var(--blue)"></span> Comptes courants</div>
-    <div class="bal-value">{{ formatMoney(balanceSummary.CheckingBalance, lang) }}</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.CheckingBalance, lang, 0) }}</div>
     <span class="badge up">↑ ? €</span></div>
   <div class="card bal-card">
     <div class="bal-label"><span class="dot" style="background:var(--purple)"></span> Épargne</div>
-    <div class="bal-value">{{ formatMoney(balanceSummary.SavingsBalance, lang) }}</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.SavingsBalance, lang, 0) }}</div>
     <span class="badge up">↑ ? %</span></div>
   <div class="card bal-card">
     <div class="bal-label"><span class="dot" style="background:var(--amber)"></span> Investissements</div>
-    <div class="bal-value">{{ formatMoney(balanceSummary.InvestmentBalance, lang) }}</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.InvestmentBalance, lang, 0) }}</div>
     <span class="badge down">↓ ? %</span></div>
 </div>
+
+<div class="row-2 anim d3">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Évolution du patrimoine</div>
+        <div class="card-sub">Solde global sur 12 mois</div>
+      </div>
+      <div class="legend-row" style="margin:0">
+        <div class="legend-tag"><span style="background:var(--green)"></span> Total</div>
+        <div class="legend-tag"><span style="background:var(--blue)"></span> Épargne</div>
+        <div class="legend-tag"><span style="background:var(--amber)"></span> Invest.</div>
+      </div>
+    </div>
+    <div class="chart-wrap" id="lineChart"></div>
+  </div>
+</div>
+
+<div class="row-3 anim d4">
 <div class="card">
   <div class="card-header">
     <div>
@@ -49,17 +68,18 @@
   <div id="txList">
     {{ range id, transaction := recentTransactions }}
     <div class="tx-item">
-      <div class="tx-icon" style="background:var(--green-bg);">💰</div>
+      <div class="tx-icon" style="background:{{ transaction.Color }}">{{ transaction.Icon }}</div>
       <div>
-        <div class="tx-name">{{ transaction.Narration }}</div>
-        <div class="tx-cat">{{ transaction.Account }}</div>
+        <div class="tx-name">{{ transaction.Payee }}</div>
+        <div class="tx-cat">{{ transaction.Alias }}</div>
       </div>
       <div class="tx-right">
-        <div class="tx-amt inc">{{ transaction.Amount }}</div>
-        <div class="tx-date">{{ transaction.Date }}</div>
+        <div class="tx-amt {{ if transaction.Amount.IsPositive() }}inc{{ else }}exp{{ end }}">{{ formatMoney(transaction.Amount, lang, 2) }}</div>
+        <div class="tx-date">{{ shortDate(transaction.Date, lang) }}</div>
       </div>
     </div>
     {{ end }}
   </div>
+</div>
 </div>
 {{ end }}
