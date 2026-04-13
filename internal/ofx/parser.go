@@ -6,10 +6,10 @@ import (
 	"context"
 	"io"
 	"iter"
-	"strconv"
 	"strings"
 	"time"
 
+	pkgcurrency "github.com/bojanz/currency"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/attribute"
@@ -35,8 +35,7 @@ type TransactionParsed struct {
 	Type          TransactionParsedType
 	Payee         string
 	Date          time.Time
-	Amount        float64
-	Currency      string
+	Amount        pkgcurrency.Amount
 	BankAccountID string
 }
 
@@ -44,15 +43,16 @@ type Parser struct {
 	Tracer trace.Tracer
 }
 
-func (p Parser) parseBlock(ctx context.Context, block string) (TransactionParsed, error) {
+func (p Parser) parseBlock(ctx context.Context, block string, currency string) (TransactionParsed, error) {
 	var tx TransactionParsed
 
 	amountRaw := p.extractTag(block, "TRNAMT")
-	amount, errAmount := strconv.ParseFloat(amountRaw, 64)
+	amount, errAmount := pkgcurrency.NewAmount(amountRaw, currency)
 
 	if errAmount != nil {
 		return tx, p.oops(ctx).
 			With("amount", amountRaw).
+			With("currency", currency).
 			Wrapf(errAmount, "failed to parse amount")
 	}
 	tx.Amount = amount
@@ -170,8 +170,7 @@ func (p Parser) Parse(orgCtx context.Context, reader io.Reader) iter.Seq2[Transa
 		})
 
 		for scanner.Scan() {
-			transaction, errParse := p.parseBlock(ctx, scanner.Text())
-			transaction.Currency = currency
+			transaction, errParse := p.parseBlock(ctx, scanner.Text(), currency)
 
 			if errParse != nil {
 				yield(TransactionParsed{}, p.oops(ctx).Wrapf(errParse, "failed to process"))
