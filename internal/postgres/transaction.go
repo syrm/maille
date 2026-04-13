@@ -146,13 +146,13 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 			Wrapf(errQuery, "failed to get transactions to classify")
 	}
 
-	dtos, err := pgx.CollectRows(rows, pgx.RowToStructByName[dto.TransactionToClassify])
+	dtos, errCollect := pgx.CollectRows(rows, pgx.RowToStructByName[dto.TransactionToClassify])
 
-	if err != nil {
+	if errCollect != nil {
 		return nil, oops.
 			In("postgres.transaction").
 			WithContext(ctx).
-			Wrapf(errQuery, "failed to collect rows transactions to classify")
+			Wrapf(errCollect, "failed to collect rows transactions to classify")
 	}
 
 	for _, toClassify := range dtos {
@@ -179,8 +179,11 @@ func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]d
 	rows, errQuery := t.pool.Query(
 		context.WithValue(ctx, SQLName, "get recent transactions"),
 		`SELECT date,
-       narration,
+       payee,
        (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
+       (ARRAY_AGG(account.alias ORDER BY posting.id))[2] as alias,
+       (ARRAY_AGG(account.icon ORDER BY posting.id))[2] as icon,
+       (ARRAY_AGG(account.color ORDER BY posting.id))[2] as color,
        (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
@@ -212,10 +215,13 @@ func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]d
 
 	for _, dbTransaction := range dtos {
 		txs = append(txs, domain.RecentTransaction{
-			Date:      dbTransaction.Date,
-			Narration: dbTransaction.Narration,
-			Account:   dbTransaction.Account,
-			Amount:    dbTransaction.Amount,
+			Date:    dbTransaction.Date,
+			Payee:   dbTransaction.Payee,
+			Account: dbTransaction.Account,
+			Amount:  dbTransaction.Amount,
+			Alias:   dbTransaction.Alias,
+			Icon:    dbTransaction.Icon,
+			Color:   dbTransaction.Color,
 		})
 	}
 
