@@ -82,23 +82,10 @@ func run(
 
 	cfg.ConnConfig.Tracer = postgres.SQLTracer{Tracer: tracerProvider.GetTracer("postgres")}
 
-	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		println("after connect")
-		err := RegisterTypes(ctx, conn)
-		if err != nil {
-			println("RegisterTypes failed: %v", err)
-		} else {
-			t, ok := conn.TypeMap().TypeForOID(16396) // ton OID price
-			println("price type registered: %v, ok: %v", t, ok)
-		}
-		return err
-	}
-
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	println("before after connect")
 
 	driver, errDriver := migratepostgres.WithInstance(stdlib.OpenDBFromPool(pool), &migratepostgres.Config{})
 	if errDriver != nil {
@@ -193,10 +180,6 @@ func run(
 		Logger:           logger,
 	}
 
-	stats := web.Stats{
-		Reporter: reporter,
-	}
-
 	dashboard := web.Dashboard{
 		Renderer: renderer,
 		Reporter: reporter,
@@ -212,7 +195,6 @@ func run(
 	r.Use(maillemiddleware.Language)
 	r.Mount("/", dashboard.Router())
 	r.Mount("/upload", upload.Router())
-	r.Mount("/stats", stats.Router())
 
 	staticFS := http.FileServer(http.Dir("./internal/web/dist"))
 	r.Handle("/assets/*", http.StripPrefix("/assets/", staticFS))
