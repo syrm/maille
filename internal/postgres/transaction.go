@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bojanz/currency"
+	pkgcurrency "github.com/bojanz/currency"
 	"github.com/bwmarrin/snowflake"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -173,7 +174,69 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 	return txs, nil
 }
 
-func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]api.Transaction, error) {
+func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]domain.RecentTransaction, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetRecentTransactions")
+	defer span.End()
+
+	txs := make([]domain.RecentTransaction, 0, size)
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "get recent transactions"),
+		`SELECT date,
+       narration,
+       (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
+       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
+       (ARRAY_AGG(currency.name ORDER BY posting.id))[1] as currency
+		FROM transaction
+		INNER JOIN posting ON (posting.transaction_id = transaction.id)
+		INNER JOIN currency ON (currency.id = posting.currency_id)
+		INNER JOIN account ON (account.id = posting.account_id)
+		GROUP BY transaction.id
+		ORDER BY transaction.id DESC
+		LIMIT @size`,
+		pgx.NamedArgs{
+			"size": size,
+		})
+
+	if errQuery != nil {
+		fmt.Printf("err %+v\n", errQuery)
+
+		return nil, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get recent transactions")
+	}
+
+	dtos, errCollect := pgx.CollectRows(rows, pgx.RowToStructByName[dto.RecentTransaction])
+
+	if errCollect != nil {
+		return nil, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errCollect, "failed to collect rows recent transactions")
+	}
+
+	for _, dbTransaction := range dtos {
+		amount, errAmount := pkgcurrency.NewAmount("3", "EUR") //(dbTransaction.Amount), dbTransaction.Currency)
+		if errAmount != nil {
+			return nil, oops.
+				In("postgres.transaction").
+				WithContext(ctx).
+				Wrapf(errAmount, "failed to create amount")
+		}
+
+		txs = append(txs, domain.RecentTransaction{
+			Date:      dbTransaction.Date,
+			Narration: dbTransaction.Narration,
+			Account:   dbTransaction.Account,
+			Amount:    amount,
+		})
+	}
+
+	return txs, nil
+}
+
+func (t *Transaction) GetRecentTransactionsAPI(ctx context.Context, size uint) ([]api.Transaction, error) {
 	ctx, span := t.tracer.Start(ctx, "Transaction.GetRecent")
 	defer span.End()
 

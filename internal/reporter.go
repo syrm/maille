@@ -10,14 +10,15 @@ import (
 
 const recentTransactionsLimit = 6
 
-type TransactionStatsProvider interface {
+type transactionStatsProvider interface {
 	GetCheckingBalance(context.Context) (int64, error)
-	GetRecentTransactions(context.Context, uint) ([]api.Transaction, error)
+	GetRecentTransactions(context.Context, uint) ([]domain.RecentTransaction, error)
+	GetRecentTransactionsAPI(context.Context, uint) ([]api.Transaction, error)
 	BalanceSummary(ctx context.Context) (domain.BalanceSummary, error)
 }
 
 type Reporter struct {
-	TransactionStatsProvider TransactionStatsProvider
+	TransactionStatsProvider transactionStatsProvider
 	Logger                   *slog.Logger
 }
 
@@ -30,6 +31,17 @@ func (r Reporter) BalanceSummary(ctx context.Context) domain.BalanceSummary {
 	}
 
 	return balanceSummary
+}
+
+func (r Reporter) RecentTransactions(ctx context.Context) []domain.RecentTransaction {
+	transactions, err := r.TransactionStatsProvider.GetRecentTransactions(ctx, recentTransactionsLimit)
+
+	if err != nil {
+		r.Logger.ErrorContext(ctx, "failed to get recent transaction", slog.Any("error", err))
+		return nil
+	}
+
+	return transactions
 }
 
 func (r Reporter) BalanceSummaryAPI(ctx context.Context) api.BalanceSummary {
@@ -46,8 +58,8 @@ func (r Reporter) BalanceSummaryAPI(ctx context.Context) api.BalanceSummary {
 	}
 }
 
-func (r Reporter) RecentTransactions(ctx context.Context) []api.Transaction {
-	transactions, err := r.TransactionStatsProvider.GetRecentTransactions(ctx, recentTransactionsLimit)
+func (r Reporter) RecentTransactionsAPI(ctx context.Context) []api.Transaction {
+	transactions, err := r.TransactionStatsProvider.GetRecentTransactionsAPI(ctx, recentTransactionsLimit)
 
 	if err != nil {
 		r.Logger.ErrorContext(ctx, "failed to get recent transaction", slog.Any("error", err))
