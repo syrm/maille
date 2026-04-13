@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/CloudyKit/jet/v6"
 	"github.com/CloudyKit/jet/v6/loaders/httpfs"
@@ -18,6 +19,7 @@ import (
 	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/goodsign/monday"
 	"github.com/google/gops/agent"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -126,11 +128,15 @@ func run(
 	sub, _ := fs.Sub(web.TemplateFS, "template")
 	loader, _ := httpfs.NewLoader(http.FS(sub))
 	views := jet.NewSet(loader)
-	views.AddGlobal("formatMoney", func(amount pkgcurrency.Amount, lang string) string {
+	views.AddGlobal("formatMoney", func(amount pkgcurrency.Amount, lang string, digits uint8) string {
 		locale := pkgcurrency.NewLocale(lang)
 		formatter := pkgcurrency.NewFormatter(locale)
-		formatter.MaxDigits = 0
+		formatter.MaxDigits = digits
 		return formatter.Format(amount)
+	})
+
+	views.AddGlobal("shortDate", func(date time.Time, lang string) string {
+		return monday.Format(date, "2 Jan", monday.Locale(lang))
 	})
 
 	renderer := web.Renderer{

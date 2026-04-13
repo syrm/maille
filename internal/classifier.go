@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	pkgcurrency "github.com/bojanz/currency"
 	"github.com/expr-lang/expr"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
@@ -14,16 +15,15 @@ import (
 )
 
 type transactionEvalCtx struct {
-	Payee     string       `expr:"payee"`
-	Narration string       `expr:"narration"`
-	Date      time.Time    `expr:"date"`
-	DayOfWeek time.Weekday `expr:"day_of_week"`
-	Month     int          `expr:"month"`
-	Year      int          `expr:"year"`
-
-	Amount   float64 `expr:"amount"`
-	Currency string  `expr:"currency"`
-	Account  string  `expr:"account"`
+	Payee     string             `expr:"payee"`
+	Narration string             `expr:"narration"`
+	Date      time.Time          `expr:"date"`
+	DayOfWeek time.Weekday       `expr:"day_of_week"`
+	Month     int                `expr:"month"`
+	Year      int                `expr:"year"`
+	Amount    pkgcurrency.Amount `expr:"amount"`
+	Currency  string             `expr:"currency"`
+	Account   string             `expr:"account"`
 
 	PostingIDToUpdate uint64
 }
@@ -56,7 +56,7 @@ type Classifier struct {
 func (c Classifier) Classify(ctx context.Context) error {
 	ctx, span := c.Tracer.Start(ctx, "Classifier")
 	defer span.End()
-
+	println("CLASSIFY")
 	//accountsID := make(map[uint64]string)
 	//{
 	//	accounts, errAccount := c.AccountProvider.GetAll(ctx)
@@ -73,6 +73,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 	//}
 
 	rules, errRule := c.RuleProvider.GetAll(ctx)
+	println("CLASSIFY 2")
 
 	if errRule != nil {
 		return oops.
@@ -80,6 +81,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 			WithContext(ctx).
 			Wrapf(errRule, "failed to get rules")
 	}
+	println("CLASSIFY 3")
 
 	for index, r := range rules {
 		fmt.Printf("Rule %#v\n", r)
@@ -98,6 +100,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 	}
 
 	txs, errTx := c.TransactionProvider.GetAllToClassify(ctx, 0, 100_000)
+	println("CLASSIFY 4", len(txs))
 
 	if errTx != nil {
 		return oops.
@@ -105,6 +108,8 @@ func (c Classifier) Classify(ctx context.Context) error {
 			WithContext(ctx).
 			Wrapf(errTx, "failed to get transactions")
 	}
+
+	println("CLASSIFY 5")
 
 	for _, tx := range txs {
 		//accountID := tx.AccountID
@@ -127,17 +132,17 @@ func (c Classifier) Classify(ctx context.Context) error {
 			PostingIDToUpdate: tx.PostingID,
 		}
 
-		fmt.Printf("posting %+v\n", posting)
+		println(fmt.Sprintf("posting %+v\n", posting))
 
 		for _, rule := range rules {
 			result, errExpr := expr.Run(rule.Program, posting)
 			if errExpr != nil {
-				fmt.Println("oups", errExpr.Error())
+				println(fmt.Sprintf("oups %+v\n", errExpr.Error()))
 				continue
 			}
 
 			if result.(bool) {
-				fmt.Println("ca match", posting.Payee, posting.Account)
+				println("ca match", posting.Payee, posting.Account)
 				err := c.PostingAccountUpdater.UpdateAccount(ctx, posting.PostingIDToUpdate, rule.Account.ID)
 				if err != nil {
 					return err

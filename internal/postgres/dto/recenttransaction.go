@@ -7,8 +7,11 @@ import (
 )
 
 type RecentTransaction struct {
-	Date      time.Time          `db:"date"`
-	Narration *string            `db:"narration"`
-	Account   string             `db:"account"`
-	Amount    pkgcurrency.Amount `db:"amount"`
+	Date    time.Time          `db:"date"`
+	Payee   *string            `db:"payee"`
+	Account string             `db:"account"`
+	Amount  pkgcurrency.Amount `db:"amount"`
+	Alias   string             `db:"alias"`
+	Icon    string             `db:"icon"`
+	Color   string             `db:"color"`
 }

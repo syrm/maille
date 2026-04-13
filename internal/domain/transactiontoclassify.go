@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	pkgcurrency "github.com/bojanz/currency"
+)
 
 type TransactionToClassify struct {
 	ID        uint64
@@ -8,7 +12,7 @@ type TransactionToClassify struct {
 	Payee     string `expr:"payee"`
 	PostingID uint64
 	AccountID uint64
-	Account   string  `expr:"account"`
-	Amount    float64 `expr:"amount"`
-	Currency  string  `expr:"currency"`
+	Account   string             `expr:"account"`
+	Amount    pkgcurrency.Amount `expr:"amount"`
+	Currency  string             `expr:"currency"`
 }
