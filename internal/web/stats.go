@@ -13,7 +13,7 @@ import (
 
 type reporterStats interface {
 	BalanceSummaryAPI(context.Context) api.BalanceSummary
-	RecentTransactions(context.Context) []api.Transaction
+	RecentTransactionsAPI(context.Context) []api.Transaction
 }
 
 type Stats struct {
@@ -29,7 +29,7 @@ func (s Stats) Router() *chi.Mux {
 
 func (s Stats) Get(w http.ResponseWriter, r *http.Request) {
 	balanceSummary := s.Reporter.BalanceSummaryAPI(r.Context())
-	recentTransactions := s.Reporter.RecentTransactions(r.Context())
+	recentTransactions := s.Reporter.RecentTransactionsAPI(r.Context())
 
 	dashboard := api.Dashboard{
 		BalanceSummary:     balanceSummary,

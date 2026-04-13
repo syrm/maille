@@ -10,13 +10,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/syrm/maille/internal/domain"
-	"github.com/syrm/maille/internal/domain/api"
 	"github.com/syrm/maille/internal/middleware"
 )
 
 type reporterDashboard interface {
 	BalanceSummary(context.Context) domain.BalanceSummary
-	RecentTransactions(context.Context) []api.Transaction
+	RecentTransactions(context.Context) []domain.RecentTransaction
 }
 
 type Dashboard struct {
@@ -35,10 +34,12 @@ func (d Dashboard) Router() *chi.Mux {
 
 func (d Dashboard) Get(w http.ResponseWriter, r *http.Request) {
 	balanceSummary := d.Reporter.BalanceSummary(r.Context())
+	recentTransactions := d.Reporter.RecentTransactions(r.Context())
 
 	variables := jet.VarMap{}
 	variables.Set("lang", r.Context().Value(middleware.LangKey))
 	variables.Set("balanceSummary", balanceSummary)
+	variables.Set("recentTransactions", recentTransactions)
 
 	if err := d.Renderer.Render(w, "home", variables); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
