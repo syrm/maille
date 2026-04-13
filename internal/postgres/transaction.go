@@ -10,6 +10,7 @@ import (
 	pkgcurrency "github.com/bojanz/currency"
 	"github.com/bwmarrin/snowflake"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
@@ -66,7 +67,7 @@ func (t *Transaction) GetAllWithPosting(ctx context.Context, after uint64, size 
 		narration *string
 		postingID uint64
 		accountID uint64
-		amount    float64
+		amount    pkgcurrency.Amount
 	)
 
 	_, errScan := pgx.ForEachRow(
@@ -316,19 +317,33 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 
 		rows = append(rows, []any{transactionID, sb.String(), true, transaction.Payee, transaction.ExternalID})
 
+		type Price struct {
+			Number       pgtype.Numeric
+			CurrencyCode pgtype.Text
+		}
+
 		for _, posting := range transaction.Postings {
+			//amountValue, amountErr := posting.Amount.Value()
+			//if amountErr != nil {
+			//	println("amountErr", amountErr)
+			//	continue
+			//}
+			p, _ := NewPrice(posting.Amount)
 			rowsPos = append(
 				rowsPos,
 				[]any{
 					node.Generate(),
 					transactionID,
 					posting.AccountID,
-					posting.Amount,
-					posting.Currency.ID,
+					//posting.Amount,
+					p, // currency.Amount
+					//fmt.Sprintf("(%v,%v)", posting.Amount.Number(), posting.Amount.CurrencyCode()),
 				},
 			)
 		}
 	}
+
+	println(fmt.Sprintf("rows: %+#v", rowsPos[4]))
 
 	tx, errBegin := t.pool.Begin(context.WithValue(ctx, SQLName, "begin transaction"))
 
@@ -351,7 +366,7 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop1, "failed to exec drop constraint currency_id")
 	// }
-
+	//
 	// _, errDrop2 := tx.Exec(
 	// 	context.WithValue(ctx, SQLName, "drop constraint origin_position_id"),
 	// 	"ALTER TABLE posting DROP CONSTRAINT posting_origin_position_id_fkey",
@@ -362,7 +377,7 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop2, "failed to exec drop constraint currency_id")
 	// }
-
+	//
 	// _, errDrop3 := tx.Exec(
 	// 	context.WithValue(ctx, SQLName, "drop constraint price_currency_id"),
 	// 	"ALTER TABLE posting DROP CONSTRAINT posting_price_currency_id_fkey",
@@ -373,7 +388,7 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	// 		WithContext(ctx).
 	// 		Wrapf(errDrop3, "failed to exec drop constraint price_currency_id")
 	// }
-
+	//
 	// _, errDrop4 := tx.Exec(
 	// 	context.WithValue(ctx, SQLName, "drop constraint transaction_id"),
 	// 	"ALTER TABLE posting DROP CONSTRAINT posting_transaction_id_fkey",
@@ -400,7 +415,7 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	_, errCopyPosting := tx.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy posting"),
 		pgx.Identifier{"posting"},
-		[]string{"id", "transaction_id", "account_id", "amount", "currency_id"},
+		[]string{"id", "transaction_id", "account_id", "amount"},
 		pgx.CopyFromRows(rowsPos),
 	)
 	if errCopyPosting != nil {
@@ -572,4 +587,20 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 	}
 
 	return balanceSummary, nil
+}
+
+type Price struct {
+	Number       pgtype.Numeric
+	CurrencyCode pgtype.Text
+}
+
+func NewPrice(a currency.Amount) (Price, error) {
+	var num pgtype.Numeric
+	if err := num.Scan(a.Number()); err != nil {
+		return Price{}, fmt.Errorf("numeric scan: %w", err)
+	}
+	return Price{
+		Number:       num,
+		CurrencyCode: pgtype.Text{String: string(a.CurrencyCode()), Valid: true},
+	}, nil
 }

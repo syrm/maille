@@ -45,7 +45,6 @@ type Importer struct {
 	TransactionStore TransactionStore
 	AccountStore     AccountStore
 	BankAccountStore BankAccountStore
-	CurrencyStore    CurrencyStore
 	Tracer           trace.Tracer
 	Logger           *slog.Logger
 }
@@ -87,20 +86,6 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 		}
 	}
 
-	currenciesID := make(map[string]domain.Currency)
-	{
-		currencies, errCurrency := i.CurrencyStore.GetAll(ctx)
-		if errCurrency != nil {
-			return oops.
-				In("importer").
-				WithContext(ctx).
-				Wrapf(errCurrency, "failed to get currencies")
-		}
-		for _, currency := range currencies {
-			currenciesID[currency.Name] = currency
-		}
-	}
-
 	transactions := []domain.Transaction{}
 	transactionsParsed := i.Parser.Parse(ctx, reader)
 
@@ -123,14 +108,14 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 				Errorf("bankaccount external_id not found")
 		}
 
-		currency, ok := currenciesID[transactionParsed.Currency]
+		amountInverse, errAmountInverse := transactionParsed.Amount.Mul("-1")
 
-		if !ok {
+		if errAmountInverse != nil {
 			return oops.
 				In("importer").
+				With("amount", transactionParsed.Amount).
 				WithContext(ctx).
-				With("currency", transactionParsed.Currency).
-				Errorf("currency id not found")
+				Wrapf(errAmountInverse, "failed to inverse amount")
 		}
 
 		transactions = append(transactions, domain.Transaction{
@@ -142,12 +127,10 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 				{
 					AccountID: mainAccountID,
 					Amount:    transactionParsed.Amount,
-					Currency:  currency,
 				},
 				{
 					AccountID: defaultExpenseTransaction.ID,
-					Amount:    -1 * transactionParsed.Amount,
-					Currency:  currency,
+					Amount:    amountInverse,
 				},
 			},
 		})

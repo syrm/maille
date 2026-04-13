@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -12,8 +14,16 @@ import (
 	pkgcurrency "github.com/bojanz/currency"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/golang-migrate/migrate/v4"
+	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/gops/agent"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/lib/pq"
 	"github.com/riandyrn/otelchi"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel"
@@ -23,6 +33,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 
+	embed "github.com/syrm/maille"
 	"github.com/syrm/maille/internal"
 	maillemiddleware "github.com/syrm/maille/internal/middleware"
 	"github.com/syrm/maille/internal/ofx"
@@ -71,9 +82,58 @@ func run(
 
 	cfg.ConnConfig.Tracer = postgres.SQLTracer{Tracer: tracerProvider.GetTracer("postgres")}
 
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		println("after connect")
+		err := RegisterTypes(ctx, conn)
+		if err != nil {
+			println("RegisterTypes failed: %v", err)
+		} else {
+			t, ok := conn.TypeMap().TypeForOID(16396) // ton OID price
+			println("price type registered: %v, ok: %v", t, ok)
+		}
+		return err
+	}
+
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return err
+	}
+	println("before after connect")
+
+	driver, errDriver := migratepostgres.WithInstance(stdlib.OpenDBFromPool(pool), &migratepostgres.Config{})
+	if errDriver != nil {
+		return oops.
+			In("run").
+			WithContext(ctx).
+			Wrapf(errDriver, "failed to create driver")
+	}
+
+	sourceDriver, errIOfs := iofs.New(embed.MigrationFS, "migration")
+	if errIOfs != nil {
+		return oops.
+			In("run").
+			WithContext(ctx).
+			Wrapf(errIOfs, "failed to create iofs")
+	}
+
+	m, errConnection := migrate.NewWithInstance(
+		"iofs", sourceDriver,
+		"postgres", driver,
+	)
+	if errConnection != nil {
+		return oops.
+			In("run").
+			WithContext(ctx).
+			Wrapf(errConnection, "failed to connect to database for migration")
+	}
+
+	errMigration := m.Up()
+
+	if !errors.Is(errMigration, migrate.ErrNoChange) && errMigration != nil {
+		return oops.
+			In("run").
+			WithContext(ctx).
+			Wrapf(errMigration, "failed to migrate database")
 	}
 
 	sub, _ := fs.Sub(web.TemplateFS, "template")
@@ -93,7 +153,6 @@ func run(
 	txStore := postgres.BuildTransaction(pool, tracerProvider.GetTracer("postgres.transaction"))
 	accountStore := postgres.BuildAccount(pool, tracerProvider.GetTracer("postgres.account"))
 	bankAccountStore := postgres.BuildBankAccount(pool, tracerProvider.GetTracer("postgres.bankaccount"))
-	currencyStore := postgres.BuildCurrency(pool, tracerProvider.GetTracer("postgres.currency"))
 	txClassifierRuleStore := postgres.BuildTransactionClassifierRule(ctx, pool, tracerProvider.GetTracer("postgres.transactionclassifierrule"))
 	postingStore := postgres.BuildPosting(pool, tracerProvider.GetTracer("postgres.posting"))
 
@@ -106,7 +165,6 @@ func run(
 		TransactionStore: txStore,
 		AccountStore:     accountStore,
 		BankAccountStore: bankAccountStore,
-		CurrencyStore:    currencyStore,
 		Tracer:           tracerProvider.GetTracer("importer"),
 		Logger:           logger,
 	}
@@ -247,4 +305,31 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 
 func (p *Provider) GetTracer(name string) trace.Tracer {
 	return p.tracerProvider.Tracer(name)
+}
+
+func RegisterTypes(ctx context.Context, conn *pgx.Conn) error {
+	var oid uint32
+	err := conn.QueryRow(ctx,
+		"SELECT oid FROM pg_type WHERE typname = 'price' AND typnamespace = 'public'::regnamespace",
+	).Scan(&oid)
+	if err != nil {
+		return fmt.Errorf("price oid: %w", err)
+	}
+
+	tm := conn.TypeMap()
+
+	numericType, _ := tm.TypeForOID(pgtype.NumericOID)
+	textType, _ := tm.TypeForOID(pgtype.TextOID)
+
+	tm.RegisterType(&pgtype.Type{
+		Name: "price",
+		OID:  oid,
+		Codec: &pgtype.CompositeCodec{
+			Fields: []pgtype.CompositeCodecField{
+				{Name: "number", Type: numericType},
+				{Name: "currency_code", Type: textType},
+			},
+		},
+	})
+	return nil
 }
