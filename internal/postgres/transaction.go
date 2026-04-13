@@ -10,13 +10,11 @@ import (
 	pkgcurrency "github.com/bojanz/currency"
 	"github.com/bwmarrin/snowflake"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/syrm/maille/internal/domain"
-	"github.com/syrm/maille/internal/domain/api"
 	"github.com/syrm/maille/internal/postgres/dto"
 )
 
@@ -128,11 +126,9 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
        (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
        (ARRAY_AGG(posting.id ORDER BY posting.id))[2] as posting_id,
        (ARRAY_AGG(account.id ORDER BY posting.id))[2] as account_id,
-       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
-       (ARRAY_AGG(currency.name ORDER BY posting.id))[1] as currency
+       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
-		INNER JOIN currency ON (currency.id = posting.currency_id)
 		INNER JOIN account ON (account.id = posting.account_id)
 		WHERE transaction.id > @after
 		GROUP BY transaction.id
@@ -168,7 +164,6 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 			AccountID: toClassify.AccountID,
 			Account:   toClassify.Account,
 			Amount:    toClassify.Amount,
-			Currency:  toClassify.Currency,
 		}
 	}
 
@@ -186,11 +181,9 @@ func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]d
 		`SELECT date,
        narration,
        (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
-       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
-       (ARRAY_AGG(currency.name ORDER BY posting.id))[1] as currency
+       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
-		INNER JOIN currency ON (currency.id = posting.currency_id)
 		INNER JOIN account ON (account.id = posting.account_id)
 		GROUP BY transaction.id
 		ORDER BY transaction.id DESC
@@ -218,78 +211,13 @@ func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]d
 	}
 
 	for _, dbTransaction := range dtos {
-		amount, errAmount := pkgcurrency.NewAmount("3", "EUR") //(dbTransaction.Amount), dbTransaction.Currency)
-		if errAmount != nil {
-			return nil, oops.
-				In("postgres.transaction").
-				WithContext(ctx).
-				Wrapf(errAmount, "failed to create amount")
-		}
-
 		txs = append(txs, domain.RecentTransaction{
 			Date:      dbTransaction.Date,
 			Narration: dbTransaction.Narration,
 			Account:   dbTransaction.Account,
-			Amount:    amount,
-		})
-	}
-
-	return txs, nil
-}
-
-func (t *Transaction) GetRecentTransactionsAPI(ctx context.Context, size uint) ([]api.Transaction, error) {
-	ctx, span := t.tracer.Start(ctx, "Transaction.GetRecent")
-	defer span.End()
-
-	txs := make([]api.Transaction, 0, size)
-
-	rows, errQuery := t.pool.Query(
-		context.WithValue(ctx, SQLName, "get recent transactions"),
-		`SELECT date,
-       narration,
-       (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
-       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
-       (ARRAY_AGG(currency.name ORDER BY posting.id))[1] as currency
-		FROM transaction
-		INNER JOIN posting ON (posting.transaction_id = transaction.id)
-		INNER JOIN currency ON (currency.id = posting.currency_id)
-		INNER JOIN account ON (account.id = posting.account_id)
-		GROUP BY transaction.id
-		ORDER BY transaction.id DESC
-		LIMIT @size`,
-		pgx.NamedArgs{
-			"size": size,
-		})
-
-	if errQuery != nil {
-		fmt.Printf("err %+v\n", errQuery)
-
-		return nil, oops.
-			In("postgres.transaction").
-			WithContext(ctx).
-			Wrapf(errQuery, "failed to get recent transactions")
-	}
-
-	dtos, errCollect := pgx.CollectRows(rows, pgx.RowToStructByName[dto.RecentTransaction])
-
-	if errCollect != nil {
-		return nil, oops.
-			In("postgres.transaction").
-			WithContext(ctx).
-			Wrapf(errCollect, "failed to collect rows recent transactions")
-	}
-
-	for _, dbTransaction := range dtos {
-		txs = append(txs, api.Transaction{
-			Date:      dbTransaction.Date,
-			Narration: dbTransaction.Narration,
-			Account:   dbTransaction.Account,
 			Amount:    dbTransaction.Amount,
-			Currency:  dbTransaction.Currency,
 		})
 	}
-
-	println("boum", len(txs))
 
 	return txs, nil
 }
@@ -300,111 +228,52 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 
 	node, _ := snowflake.NewNode(1)
 
-	rows := make([][]any, 0, len(transactions))
-	rowsPos := make([][]any, 0, len(transactions)*3)
+	// Build text data for both transaction and posting tables in a single loop
+	var trSb strings.Builder
+	var posSb strings.Builder
+
 	for _, transaction := range transactions {
 		transactionID := node.Generate()
 
-		// Build date.
+		// Add transaction to transaction builder
 		date := transaction.Date.Format(time.DateOnly)
-		var sb strings.Builder
-		sb.Grow(10)
-		sb.WriteString(date[0:4])
-		sb.WriteByte('-')
-		sb.WriteString(date[5:7])
-		sb.WriteByte('-')
-		sb.WriteString(date[8:10])
+		trSb.WriteString(fmt.Sprintf("%d\t%s\tt\t%s\t%s\n",
+			transactionID,
+			date,
+			transaction.Payee,
+			transaction.ExternalID))
 
-		rows = append(rows, []any{transactionID, sb.String(), true, transaction.Payee, transaction.ExternalID})
-
-		type Price struct {
-			Number       pgtype.Numeric
-			CurrencyCode pgtype.Text
-		}
-
+		// Add postings for this transaction using the same transactionID
 		for _, posting := range transaction.Postings {
-			//amountValue, amountErr := posting.Amount.Value()
-			//if amountErr != nil {
-			//	println("amountErr", amountErr)
-			//	continue
-			//}
-			p, _ := NewPrice(posting.Amount)
-			rowsPos = append(
-				rowsPos,
-				[]any{
-					node.Generate(),
-					transactionID,
-					posting.AccountID,
-					//posting.Amount,
-					p, // currency.Amount
-					//fmt.Sprintf("(%v,%v)", posting.Amount.Number(), posting.Amount.CurrencyCode()),
-				},
-			)
+			postingID := node.Generate()
+			// Format price composite type as (number,currency_code)
+			posSb.WriteString(fmt.Sprintf("%d\t%d\t%d\t(%s,%s)\n",
+				postingID,
+				transactionID,
+				posting.AccountID,
+				posting.Amount.Number(),
+				posting.Amount.CurrencyCode()))
 		}
 	}
-
-	println(fmt.Sprintf("rows: %+#v", rowsPos[4]))
+	trSb.WriteString("\\.\n")
+	posSb.WriteString("\\.\n")
 
 	tx, errBegin := t.pool.Begin(context.WithValue(ctx, SQLName, "begin transaction"))
-
 	if errBegin != nil {
 		return oops.
 			In("postgres.transaction").
 			WithContext(ctx).
 			Wrapf(errBegin, "failed to begin transaction")
 	}
-
 	defer tx.Rollback(context.WithValue(ctx, SQLName, "rollback transaction"))
 
-	// _, errDrop1 := tx.Exec(
-	// 	context.WithValue(ctx, SQLName, "drop constraint currency_id"),
-	// 	"ALTER TABLE posting DROP CONSTRAINT posting_currency_id_fkey",
-	// )
-	// if errDrop1 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errDrop1, "failed to exec drop constraint currency_id")
-	// }
-	//
-	// _, errDrop2 := tx.Exec(
-	// 	context.WithValue(ctx, SQLName, "drop constraint origin_position_id"),
-	// 	"ALTER TABLE posting DROP CONSTRAINT posting_origin_position_id_fkey",
-	// )
-	// if errDrop2 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errDrop2, "failed to exec drop constraint currency_id")
-	// }
-	//
-	// _, errDrop3 := tx.Exec(
-	// 	context.WithValue(ctx, SQLName, "drop constraint price_currency_id"),
-	// 	"ALTER TABLE posting DROP CONSTRAINT posting_price_currency_id_fkey",
-	// )
-	// if errDrop3 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errDrop3, "failed to exec drop constraint price_currency_id")
-	// }
-	//
-	// _, errDrop4 := tx.Exec(
-	// 	context.WithValue(ctx, SQLName, "drop constraint transaction_id"),
-	// 	"ALTER TABLE posting DROP CONSTRAINT posting_transaction_id_fkey",
-	// )
-	// if errDrop4 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errDrop4, "failed to drop constraint")
-	// }
-
-	_, errCopyTr := tx.CopyFrom(
+	// Copy transaction data using text format
+	pgConn := tx.Conn().PgConn()
+	trReader := strings.NewReader(trSb.String())
+	_, errCopyTr := pgConn.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy transaction"),
-		pgx.Identifier{"transaction"},
-		[]string{"id", "date", "completed", "payee", "external_id"},
-		pgx.CopyFromRows(rows),
+		trReader,
+		"COPY transaction (id, date, completed, payee, external_id) FROM STDIN",
 	)
 	if errCopyTr != nil {
 		return oops.
@@ -412,11 +281,13 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 			WithContext(ctx).
 			Wrapf(errCopyTr, "failed to exec copy transaction")
 	}
-	_, errCopyPosting := tx.CopyFrom(
+
+	// Copy posting data using text format
+	posReader := strings.NewReader(posSb.String())
+	_, errCopyPosting := pgConn.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy posting"),
-		pgx.Identifier{"posting"},
-		[]string{"id", "transaction_id", "account_id", "amount"},
-		pgx.CopyFromRows(rowsPos),
+		posReader,
+		"COPY posting (id, transaction_id, account_id, amount) FROM STDIN",
 	)
 	if errCopyPosting != nil {
 		return oops.
@@ -424,40 +295,6 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 			WithContext(ctx).
 			Wrapf(errCopyPosting, "failed to exec copy posting")
 	}
-
-	// _, errAdd1 := tx.Exec(
-	// 	context.WithValue(ctx, SQLName, "add constraint currency_id"),
-	// 	`ALTER TABLE posting ADD CONSTRAINT posting_currency_id_fkey FOREIGN KEY (currency_id) REFERENCES currency(id)`,
-	// )
-	// if errAdd1 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errAdd1, "failed to add constraint currency_id")
-	// }
-	// _, errAdd2 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint origin_position_id"),
-	// 	"ALTER TABLE posting ADD CONSTRAINT posting_origin_position_id_fkey FOREIGN KEY (origin_position_id) REFERENCES position(id)",
-	// )
-	// if errAdd2 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errAdd2, "failed to add constraint origin_position_id")
-	// }
-	// _, errAdd3 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint price_currency_id"), "ALTER TABLE posting ADD CONSTRAINT posting_price_currency_id_fkey FOREIGN KEY (price_currency_id) REFERENCES currency(id)")
-	// if errAdd3 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errAdd3, "failed to add constraint currency_id")
-	// }
-	// _, errAdd4 := tx.Exec(context.WithValue(ctx, SQLName, "add constraint transaction_id"), "ALTER TABLE posting ADD CONSTRAINT posting_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transaction(id)")
-	// if errAdd4 != nil {
-	// 	return oops.
-	// 		In("Transaction").
-	// 		WithContext(ctx).
-	// 		Wrapf(errAdd4, "failed to add constraint transaction_id")
-	// }
 
 	errCmt := tx.Commit(context.WithValue(ctx, SQLName, "commit transaction"))
 	if errCmt != nil {
@@ -502,12 +339,11 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 
 	rows, errQuery := t.pool.Query(
 		context.WithValue(ctx, SQLName, "get balanceSummary"),
-		`SELECT a.name, COALESCE(CAST(ROUND(SUM(amount)) AS bigint), 0) AS amount, currency.name
+		`SELECT a.name, COALESCE(ROW(ROUND(SUM((amount).number)), 'EUR')::price, ROW(0, 'EUR')::price) AS amount
 		FROM account AS a
 		INNER JOIN posting ON posting.account_id = a.id
-		INNER JOIN currency ON currency.id = posting.currency_id
 		WHERE type = 'Assets' AND a.name IN ('Bank:Checking', 'Bank:Savings', 'Bank:Investment')
-		GROUP BY a.id, currency.id`,
+		GROUP BY a.id`,
 	)
 
 	if errQuery != nil {
@@ -518,26 +354,17 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 	}
 
 	var name string
-	var amount string
-	var currencyName string
+	var amount pkgcurrency.Amount
 
 	totalAmount, _ := currency.NewAmount("0", "EUR")
 	balanceSummary.TotalBalance = totalAmount
 
 	_, errScan := pgx.ForEachRow(
 		rows,
-		[]any{&name, &amount, &currencyName},
+		[]any{&name, &amount},
 		func() error {
-			currencyAmount, errCurrency := currency.NewAmount(amount, currencyName)
-			if errCurrency != nil {
-				return oops.
-					In("postgres.transaction").
-					WithContext(ctx).
-					Wrapf(errCurrency, "failed to create currency amount for %s", name)
-			}
-
 			if name == "Bank:Checking" {
-				amountWithChecking, errAddChecking := balanceSummary.TotalBalance.Add(currencyAmount)
+				amountWithChecking, errAddChecking := balanceSummary.TotalBalance.Add(amount)
 				if errAddChecking != nil {
 					return oops.
 						In("postgres.transaction").
@@ -546,11 +373,11 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 				}
 
 				balanceSummary.TotalBalance = amountWithChecking
-				balanceSummary.CheckingBalance = currencyAmount
+				balanceSummary.CheckingBalance = amount
 			}
 
 			if name == "Bank:Savings" {
-				amountWithSavings, errAddSavings := balanceSummary.TotalBalance.Add(currencyAmount)
+				amountWithSavings, errAddSavings := balanceSummary.TotalBalance.Add(amount)
 				if errAddSavings != nil {
 					return oops.
 						In("postgres.transaction").
@@ -559,11 +386,11 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 				}
 
 				balanceSummary.TotalBalance = amountWithSavings
-				balanceSummary.SavingsBalance = currencyAmount
+				balanceSummary.SavingsBalance = amount
 			}
 
 			if name == "Bank:Investment" {
-				amountWithInvestment, errAddInvestment := balanceSummary.TotalBalance.Add(currencyAmount)
+				amountWithInvestment, errAddInvestment := balanceSummary.TotalBalance.Add(amount)
 				if errAddInvestment != nil {
 					return oops.
 						In("postgres.transaction").
@@ -572,7 +399,7 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 				}
 
 				balanceSummary.TotalBalance = amountWithInvestment
-				balanceSummary.InvestmentBalance = currencyAmount
+				balanceSummary.InvestmentBalance = amount
 			}
 
 			return nil
@@ -587,20 +414,4 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 	}
 
 	return balanceSummary, nil
-}
-
-type Price struct {
-	Number       pgtype.Numeric
-	CurrencyCode pgtype.Text
-}
-
-func NewPrice(a currency.Amount) (Price, error) {
-	var num pgtype.Numeric
-	if err := num.Scan(a.Number()); err != nil {
-		return Price{}, fmt.Errorf("numeric scan: %w", err)
-	}
-	return Price{
-		Number:       num,
-		CurrencyCode: pgtype.Text{String: string(a.CurrencyCode()), Valid: true},
-	}, nil
 }
