@@ -16,7 +16,7 @@ run = '''#!/usr/bin/elvish
 
 [tasks.front]
 dir = "frontend/microchart"
-run = "npm run res:build"
+run = "npm run build"
 
 [tasks.build]
 run = "podman build --layers -t localhost/maille-dev:latest -f deploy/Containerfile.dev ."
