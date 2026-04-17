@@ -1,10 +1,10 @@
 {
-  "name": "microchart-res",
+  "name": "microchart",
   "version": "0.1.0",
   "scripts": {
+    "build": "rescript && vite build",
     "res:build": "rescript",
     "res:watch": "rescript watch",
-    "build": "rescript && vite build",
     "dev": "vite"
   },
   "dependencies": {},
