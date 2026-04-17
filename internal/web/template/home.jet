@@ -53,7 +53,10 @@
         <div class="legend-tag"><span style="background:var(--amber)"></span> Invest.</div>
       </div>
     </div>
-    <div class="chart-wrap" id="lineChart"></div>
+    <div class="chart-wrap" id="net-worth-history-chart"></div>
+    <script type="application/json" id="app-data">
+      {{ raw(json(netWorthHistory)) }}
+    </script>
   </div>
 </div>
 

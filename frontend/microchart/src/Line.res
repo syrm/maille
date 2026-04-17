@@ -1,5 +1,3 @@
-// Line.res
-
 type series = {
   name:   string,
   data:   array<float>,
@@ -18,7 +16,72 @@ type options = {
   colors: option<array<string>>,
 }
 
-let make = (container: Core.element, series: array<series>, opts: options) => {
+type chart = {
+  series: array<series>,
+  options: options,
+}
+
+let parseSeries = (json: JSON.t): series =>
+  switch json {
+  | Object(dict{
+      "name": JSON.String(name),
+      "data": JSON.Array(rawData),
+      "color": ?color,
+      "area": JSON.Boolean(area),
+      "dashed": JSON.Boolean(dashed)
+    }) =>
+    let data = rawData->Array.map(Core.asFloat)
+    let color = Core.optField(color, Core.asString)
+    {name, data, color, area, dashed}
+  | _ => throw(Core.InvalidJson(Core.InvalidData("")))
+  }
+
+let parseOptions = (json: JSON.t): options =>
+  switch json {
+  | Object(dict{
+      "width":  ?width,
+      "height": ?height,
+      "labels": ?labels,
+      "yTicks": ?yTicks,
+      "smooth": JSON.Boolean(smooth),
+      "points": JSON.Boolean(points),
+      "colors": ?colors,
+    }) => {
+      width:  Core.optField(width,  Core.asFloat),
+      height: Core.optField(height, Core.asFloat),
+      labels: Core.optField(labels, Core.asStringArray),
+      yTicks: Core.optField(yTicks, Core.asInt),
+      smooth: smooth,
+      points: points,
+      colors: Core.optField(colors, Core.asStringArray),
+    }
+  | _ => throw(Core.InvalidJson(Core.InvalidOption("")))
+  }
+
+let parseChart = (json: JSON.t): chart =>
+  switch json {
+  | Object(dict{
+    "series": JSON.Array(rawSeries),
+    "options": ?rawOpts
+    }) =>
+    let series = rawSeries->Array.map(parseSeries)
+    let options = switch rawOpts {
+    | None | Some(Null) => {
+        width: None,
+        height: None,
+        labels: None,
+        yTicks: None,
+        smooth: false,
+        points: false,
+        colors: None
+      }
+    | Some(v) => parseOptions(v)
+    }
+    {series, options}
+  | _ => throw(Core.InvalidJson(Core.InvalidChart("")))
+  }
+
+let make = (container: Dom.element, series: array<series>, opts: options) => {
   let w       = Option.getOr(opts.width,  600.)
   let h       = Option.getOr(opts.height, 240.)
   let yTicks  = Option.getOr(opts.yTicks, 5)
@@ -102,10 +165,10 @@ let make = (container: Core.element, series: array<series>, opts: options) => {
       let val_  = Array.getUnsafe(s.data, i)
       let lbl   = Option.getOr(Array.get(labels, i), "")
       let name  = s.name
-      Core.addEventListener(target, "mouseenter", (e: Core.mouseEvent) =>
+      Core.addEventListener(target, "mouseenter", (e: Dom.mouseEvent) =>
         Core.showTip(tip, `<b style="color:${c}">${name}</b><br/>${lbl}: <b>${Core.fmtVal(val_)}</b>`, e))
-      Core.addEventListener(target, "mousemove",  (e: Core.mouseEvent) => Core.moveTip(tip, e))
-      Core.addEventListener(target, "mouseleave", (_: Core.mouseEvent) => Core.hideTip(tip))
+      Core.addEventListener(target, "mousemove",  (e: Dom.mouseEvent) => Core.moveTip(tip, e))
+      Core.addEventListener(target, "mouseleave", (_: Dom.mouseEvent) => Core.hideTip(tip))
     })
   })
 

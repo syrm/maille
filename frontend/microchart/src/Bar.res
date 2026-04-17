@@ -1,5 +1,3 @@
-// Bar.res
-
 type series = {
   name:  string,
   data:  array<float>,
@@ -15,7 +13,61 @@ type options = {
   colors: option<array<string>>,
 }
 
-let make = (container: Core.element, series: array<series>, opts: options) => {
+type chart = {
+  series: array<series>,
+  options: option<options>,
+}
+
+let parseSeries = (json: JSON.t): series =>
+  switch json {
+  | Object(dict{
+      "name": JSON.String(name),
+      "data": JSON.Array(rawData),
+      "color": ?color,
+    }) =>
+    let data = rawData->Array.map(Core.asFloat)
+    let color = Core.optField(color, Core.asString)
+    {name, data, color}
+  | _ => throw(Core.InvalidJson(Core.InvalidData("")))
+  }
+
+let parseOptions = (json: JSON.t): options =>
+  switch json {
+  | Object(dict{
+      "width":  ?width,
+      "height": ?height,
+      "labels": ?labels,
+      "yTicks": ?yTicks,
+      "gap":    ?gap,
+      "colors": ?colors,
+    }) => {
+      width:  Core.optField(width,  Core.asFloat),
+      height: Core.optField(height, Core.asFloat),
+      labels: Core.optField(labels, Core.asStringArray),
+      yTicks: Core.optField(yTicks, Core.asInt),
+      gap:    Core.optField(gap,    Core.asFloat),
+      colors: Core.optField(colors, Core.asStringArray),
+    }
+  | _ => throw(Core.InvalidJson(Core.InvalidOption("")))
+  }
+
+let parseChart = (json: JSON.t): chart =>
+  switch json {
+  | Object(dict{
+    "series": JSON.Array(rawSeries),
+    "options": ?rawOpts
+    }) =>
+    let series = rawSeries->Array.map(parseSeries)
+    let options = switch rawOpts {
+    | None | Some(Null) => None
+    | Some(v) => Some(parseOptions(v))
+    }
+    {series, options}
+  | _ => throw(Core.InvalidJson(Core.InvalidChart("")))
+  }
+
+
+let make = (container: Dom.element, series: array<series>, opts: options) => {
   let w       = Option.getOr(opts.width,  600.)
   let h       = Option.getOr(opts.height, 280.)
   let yTicks  = Option.getOr(opts.yTicks, 5)
@@ -71,10 +123,10 @@ let make = (container: Core.element, series: array<series>, opts: options) => {
         ("height", Core.f2(bh)),
         ("fill",   c), ("rx", "2"), ("style", "cursor:pointer"),
       ], g)
-      Core.addEventListener(r, "mouseenter", (e: Core.mouseEvent) =>
+      Core.addEventListener(r, "mouseenter", (e: Dom.mouseEvent) =>
         Core.showTip(tip, `<b style="color:${c}">${name}</b><br/>${lbl}: <b>${Core.fmtVal(val_)}</b>`, e))
-      Core.addEventListener(r, "mousemove",  (e: Core.mouseEvent) => Core.moveTip(tip, e))
-      Core.addEventListener(r, "mouseleave", (_: Core.mouseEvent) => Core.hideTip(tip))
+      Core.addEventListener(r, "mousemove",  (e: Dom.mouseEvent) => Core.moveTip(tip, e))
+      Core.addEventListener(r, "mouseleave", (_: Dom.mouseEvent) => Core.hideTip(tip))
     })
   }
 
