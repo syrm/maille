@@ -1,5 +1,5 @@
 {
-  "name": "microchart",
+  "name": "maille",
   "version": "0.1.0",
   "scripts": {
     "build": "rescript && vite build",

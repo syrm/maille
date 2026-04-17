@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "rescript": "^12.2.0"
+  },
+  "devDependencies": {
+    "@rescript/language-server": "^1.72.0"
   }
 }

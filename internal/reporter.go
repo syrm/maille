@@ -13,6 +13,7 @@ type transactionStatsProvider interface {
 	GetCheckingBalance(context.Context) (int64, error)
 	GetRecentTransactions(context.Context, uint) ([]domain.RecentTransaction, error)
 	BalanceSummary(ctx context.Context) (domain.BalanceSummary, error)
+	NetWorthHistory(ctx context.Context) ([]domain.NetWorthHistory, error)
 }
 
 type Reporter struct {
@@ -40,4 +41,15 @@ func (r Reporter) RecentTransactions(ctx context.Context) []domain.RecentTransac
 	}
 
 	return transactions
+}
+
+func (r Reporter) NetWorthHistory(ctx context.Context) []domain.NetWorthHistory {
+	netWorthHistory, err := r.TransactionStatsProvider.NetWorthHistory(ctx)
+
+	if err != nil {
+		r.Logger.ErrorContext(ctx, "failed to get net worth history", slog.Any("error", err))
+		return nil
+	}
+
+	return netWorthHistory
 }

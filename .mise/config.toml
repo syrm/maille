@@ -15,7 +15,7 @@ run = '''#!/usr/bin/elvish
 '''
 
 [tasks.front]
-dir = "frontend/microchart"
+dir = "frontend"
 run = "npm run build"
 
 [tasks.build]

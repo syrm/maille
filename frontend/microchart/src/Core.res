@@ -3,33 +3,72 @@
 let svgNS = "http://www.w3.org/2000/svg"
 
 // ─── Raw DOM bindings ────────────────────────────────────────────────────────
-
-type element
-type mouseEvent
+@val @scope("document")
+external createElementNS: (string, string) => Dom.element = "createElementNS"
 
 @val @scope("document")
-external createElementNS: (string, string) => element = "createElementNS"
+external createElement_: string => Dom.element = "createElement"
 
-@val @scope("document")
-external createElement_: string => element = "createElement"
+@send external getElementById: (Dom.document, string) => Nullable.t<Dom.element> = "getElementById"
 
-@val @scope("document")
-external getElementById: string => element = "getElementById"
+@send external setAttribute: (Dom.element, string, string) => unit = "setAttribute"
+@send external appendChild: (Dom.element, Dom.element) => Dom.element = "appendChild"
+@send external remove: Dom.element => unit = "remove"
+@set  external setInnerHTML: (Dom.element, string) => unit = "innerHTML"
+@send external addEventListener: (Dom.element, string, 'a => unit) => unit = "addEventListener"
+@send external removeAttribute: (Dom.element, string) => unit = "removeAttribute"
 
-@send external setAttribute: (element, string, string) => unit = "setAttribute"
-@send external appendChild: (element, element) => element = "appendChild"
-@send external remove: element => unit = "remove"
-@set  external setInnerHTML: (element, string) => unit = "innerHTML"
-@send external addEventListener: (element, string, 'a => unit) => unit = "addEventListener"
-@send external removeAttribute: (element, string) => unit = "removeAttribute"
-
-@val @scope("document") external body: element = "body"
+@val @scope("document") external body: Dom.element = "body"
 
 // style proxy — untyped on purpose (@get car c'est une propriété, pas une méthode)
-@get external getStyle: element => {..} = "style"
+@get external getStyle: Dom.element => {..} = "style"
 
-@get external clientX: mouseEvent => int = "clientX"
-@get external clientY: mouseEvent => int = "clientY"
+@get external clientX: Dom.mouseEvent => int = "clientX"
+@get external clientY: Dom.mouseEvent => int = "clientY"
+
+// ── Helper ───────────────────────────────────────────────────────────────────
+type invalidJson =
+  | InvalidData(string)
+  | InvalidOption(string)
+  | InvalidChart(string)
+  | InvalidString(string)
+  | InvalidFloat(string)
+  | InvalidInt(string)
+  | InvalidStringArray(string)
+
+exception InvalidJson(invalidJson)
+
+let optField = (v: option<JSON.t>, decode: JSON.t => 'a): option<'a> =>
+  switch v {
+  | None | Some(Null) => None
+  | Some(x) => Some(decode(x))
+  }
+
+let asString = v => switch v {
+| JSON.String(n) => n
+| _ => throw(InvalidJson(InvalidString("")))
+}
+
+let asFloat = v => switch v {
+| JSON.Number(n) => n
+| _ => throw(InvalidJson(InvalidFloat("")))
+}
+
+let asInt = v => switch v {
+| JSON.Number(n) => Float.toInt(n)
+| _ => throw(InvalidJson(InvalidInt("")))
+}
+
+let asStringArray = v => switch v {
+| JSON.Array(arr) =>
+  arr->Array.map(value =>
+    switch value {
+    | String(s) => s
+    | _ => throw(InvalidJson(InvalidString("in array")))
+    }
+  )
+| _ => throw(InvalidJson(InvalidStringArray("")))
+}
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
@@ -102,7 +141,7 @@ let text = (parent, x, y, content, attrs) => {
 
 // ─── Tooltip ─────────────────────────────────────────────────────────────────
 
-type tooltip = { el: element }
+type tooltip = { el: Dom.element }
 
 let makeTooltip = () => {
   let d = createElement_("div")
@@ -123,7 +162,7 @@ let makeTooltip = () => {
   { el: d }
 }
 
-let showTip = (tip, html, e: mouseEvent) => {
+let showTip = (tip, html, e: Dom.mouseEvent) => {
   setInnerHTML(tip.el, html)
   let s = getStyle(tip.el)
   s["opacity"] = "1"
@@ -131,7 +170,7 @@ let showTip = (tip, html, e: mouseEvent) => {
   s["top"]     = `${Int.toString(clientY(e) - 28)}px`
 }
 
-let moveTip = (tip, e: mouseEvent) => {
+let moveTip = (tip, e: Dom.mouseEvent) => {
   let s = getStyle(tip.el)
   s["left"] = `${Int.toString(clientX(e) + 12)}px`
   s["top"]  = `${Int.toString(clientY(e) - 28)}px`

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -196,8 +197,6 @@ func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]d
 		})
 
 	if errQuery != nil {
-		fmt.Printf("err %+v\n", errQuery)
-
 		return nil, oops.
 			In("postgres.transaction").
 			WithContext(ctx).
@@ -348,7 +347,9 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 		`SELECT a.name, COALESCE(ROW(ROUND(SUM((amount).number)), 'EUR')::price, ROW(0, 'EUR')::price) AS amount
 		FROM account AS a
 		INNER JOIN posting ON posting.account_id = a.id
+		INNER JOIN transaction ON posting.transaction_id = transaction.id
 		WHERE type = 'Assets' AND a.name IN ('Bank:Checking', 'Bank:Savings', 'Bank:Investment')
+		AND transaction.date <= CURRENT_DATE
 		GROUP BY a.id`,
 	)
 
@@ -420,4 +421,100 @@ func (t *Transaction) BalanceSummary(ctx context.Context) (domain.BalanceSummary
 	}
 
 	return balanceSummary, nil
+}
+
+func (t *Transaction) NetWorthHistory(ctx context.Context) ([]domain.NetWorthHistory, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.GetCheckingBalance")
+	defer span.End()
+
+	var netWorthHistory []domain.NetWorthHistory
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "get net worth history"),
+		`WITH bounds AS (
+    SELECT DATE_TRUNC('month', CURRENT_DATE - INTERVAL '12 MONTHS') AS window_start,
+           DATE_TRUNC('month', CURRENT_DATE) AS window_end
+),
+months AS (
+    SELECT generate_series(window_start, window_end, INTERVAL '1 month') AS month
+    FROM bounds
+),
+accounts AS (
+    SELECT id, name
+    FROM account
+    WHERE type = 'Assets'
+      AND name IN ('Bank:Checking', 'Bank:Savings', 'Bank:Investment')
+),
+monthly_raw AS (
+    SELECT
+        a.id AS account_id,
+        GREATEST(DATE_TRUNC('month', transaction.date), b.window_start) AS month,
+        CAST(ROUND(SUM((posting.amount).number)) AS bigint) AS amount
+    FROM accounts a
+    INNER JOIN posting     ON posting.account_id     = a.id
+    INNER JOIN transaction ON posting.transaction_id = transaction.id
+    CROSS JOIN bounds b
+    WHERE transaction.date <= CURRENT_DATE
+    GROUP BY a.id, GREATEST(DATE_TRUNC('month', transaction.date), b.window_start)
+),
+per_month AS (
+    SELECT
+        a.id AS account_id,
+        a.name,
+        m.month,
+        SUM(COALESCE(mr.amount, 0)) OVER (
+            PARTITION BY a.id
+            ORDER BY m.month
+        ) AS amount_cumulative
+    FROM accounts a
+    CROSS JOIN months m
+    LEFT JOIN monthly_raw mr
+           ON mr.account_id = a.id
+          AND mr.month      = m.month
+)
+SELECT
+    name,
+    ARRAY_AGG(month             ORDER BY month) AS dates,
+    ARRAY_AGG(amount_cumulative ORDER BY month) AS amounts
+FROM per_month
+GROUP BY name
+ORDER BY name`,
+	)
+
+	if errQuery != nil {
+		return netWorthHistory, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get net worth history")
+	}
+
+	dtos, errCollect := pgx.CollectRows(rows, pgx.RowToStructByName[dto.NetWorthHistory])
+
+	if errCollect != nil {
+		return netWorthHistory, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errCollect, "failed to collect rows net worth history")
+	}
+
+	for _, dbNetWorthHistory := range dtos {
+		var amounts []pkgcurrency.Amount
+		for _, amount := range dbNetWorthHistory.Amounts {
+			amountCurr, errCurr := pkgcurrency.NewAmount(strconv.FormatFloat(amount, 'f', 2, 64), "EUR")
+			if errCurr != nil {
+				return netWorthHistory, oops.
+					In("postgres.transaction").
+					WithContext(ctx).
+					Wrapf(errCurr, "failed to create currency for amount %f", amount)
+			}
+			amounts = append(amounts, amountCurr)
+		}
+		netWorthHistory = append(netWorthHistory, domain.NetWorthHistory{
+			Name:    dbNetWorthHistory.Name,
+			Dates:   dbNetWorthHistory.Dates,
+			Amounts: amounts,
+		})
+	}
+
+	return netWorthHistory, nil
 }

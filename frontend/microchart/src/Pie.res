@@ -1,5 +1,3 @@
-// Pie.res
-
 type slice = {
   label: string,
   value: float,
@@ -15,6 +13,60 @@ type options = {
   showLabel:  bool,
   colors:     option<array<string>>,
 }
+
+type chart = {
+  slices: array<slice>,
+  options: option<options>,
+}
+
+let parseSlice = (json: JSON.t): slice =>
+  switch json {
+  | Object(dict{
+      "label": JSON.String(label),
+      "value": JSON.Number(value),
+      "color": ?color,
+    }) =>
+    let color = Core.optField(color, Core.asString)
+    {label, value, color}
+  | _ => throw(Core.InvalidJson(Core.InvalidData("")))
+  }
+
+let parseOptions = (json: JSON.t): options =>
+  switch json {
+  | Object(dict{
+      "width":  ?width,
+      "height": ?height,
+      "donut": JSON.Boolean(donut),
+      "donutWidth": ?donutWidth,
+      "padAngle": ?padAngle,
+      "showLabel": JSON.Boolean(showLabel),
+      "colors": ?colors,
+    }) => {
+      width:  Core.optField(width,  Core.asFloat),
+      height: Core.optField(height, Core.asFloat),
+      donut: donut,
+      donutWidth: Core.optField(donutWidth, Core.asFloat),
+      padAngle: Core.optField(padAngle, Core.asFloat),
+      showLabel: showLabel,
+      colors: Core.optField(colors, Core.asStringArray),
+    }
+  | _ => throw(Core.InvalidJson(Core.InvalidOption("")))
+  }
+
+let parseChart = (json: JSON.t): chart =>
+  switch json {
+  | Object(dict{
+    "slices": JSON.Array(rawSlices),
+    "options": ?rawOpts
+    }) =>
+    let slices = rawSlices->Array.map(parseSlice)
+    let options = switch rawOpts {
+    | None | Some(Null) => None
+    | Some(v) => Some(parseOptions(v))
+    }
+    {slices, options}
+  | _ => throw(Core.InvalidJson(Core.InvalidChart("")))
+  }
 
 let arcPath = (cx, cy, r, ir, start, end_) => {
   let x1    = cx + r * Math.cos(start)
@@ -36,7 +88,7 @@ let arcPath = (cx, cy, r, ir, start, end_) => {
   }
 }
 
-let make = (container: Core.element, slices: array<slice>, opts: options) => {
+let make = (container: Dom.element, slices: array<slice>, opts: options) => {
   let w      = Option.getOr(opts.width,      280.)
   let h      = Option.getOr(opts.height,     240.)
   let colors = Option.getOr(opts.colors,     Core.palette)
@@ -83,13 +135,13 @@ let make = (container: Core.element, slices: array<slice>, opts: options) => {
     let pctStr = `${Float.toFixed(pct * 100., ~digits=0)}%`
     let lbl    = sl.label
     let val_   = sl.value
-    Core.addEventListener(p, "mouseenter", (e: Core.mouseEvent) => {
+    Core.addEventListener(p, "mouseenter", (e: Dom.mouseEvent) => {
       Core.showTip(tip, `<b style="color:${c}">${lbl}</b><br/>${pctStr} (${Core.fmtVal(val_)})`, e)
       Core.setAttribute(p, "transform",
         `translate(${Core.f2(Math.cos(mid) * 4.)},${Core.f2(Math.sin(mid) * 4.)})`)
     })
-    Core.addEventListener(p, "mousemove",  (e: Core.mouseEvent) => Core.moveTip(tip, e))
-    Core.addEventListener(p, "mouseleave", (_: Core.mouseEvent) => {
+    Core.addEventListener(p, "mousemove",  (e: Dom.mouseEvent) => Core.moveTip(tip, e))
+    Core.addEventListener(p, "mouseleave", (_: Dom.mouseEvent) => {
       Core.hideTip(tip)
       Core.removeAttribute(p, "transform")
     })
