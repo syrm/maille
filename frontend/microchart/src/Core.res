@@ -100,7 +100,6 @@ let svgEl = (w, h, container) => {
   elIn("svg", [
     ("viewBox", `0 0 ${Float.toString(w)} ${Float.toString(h)}`),
     ("width",   "100%"),
-    ("height",  "100%"),
     ("xmlns",   svgNS),
     ("style",   "display:block;overflow:visible"),
   ], container)

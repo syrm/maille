@@ -145,6 +145,40 @@ body {
     margin-top: 2px;
 }
 
+/* ─── LAYOUT GRID ─── */
+.row-2 {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 14px; margin-bottom: 20px;
+}
+
+.row-3 {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px; margin-bottom: 20px;
+}
+
+/* ─── LINE CHART ─── */
+
+.legend-row { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+.legend-tag { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); }
+.legend-tag span { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+/* ─── DONUT ─── */
+.donut-wrap { display: flex; align-items: center; gap: 24px; }
+.donut-wrap svg { width: 160px; height: 160px; flex-shrink: 0; }
+.donut-center { fill: var(--text); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 16px; }
+.donut-center-sub { fill: var(--text-3); font-size: 10px; }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.dl-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: var(--r-sm);
+    cursor: pointer; transition: background .15s;
+}
+.dl-item:hover { background: rgba(255,255,255,.025); }
+.dl-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+.dl-name { flex: 1; font-size: 12px; font-weight: 500; }
+.dl-val { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+.dl-pct { font-size: 10px; color: var(--text-3); width: 36px; text-align: right; }
+
 /* ─── BALANCE ROW ─── */
 .balance-row {
     display: grid;
