@@ -176,6 +176,12 @@ func run(
 		Logger:                   logger,
 	}
 
+	webClassifier := web.Classifier{
+		Classifier: classifier,
+		Tracer:     tracerProvider.GetTracer("maille-web"),
+		Logger:     logger,
+	}
+
 	upload := web.Upload{
 		Renderer:         renderer,
 		AccountStore:     accountStore,
@@ -201,6 +207,7 @@ func run(
 	r.Use(maillemiddleware.Language)
 	r.Mount("/", dashboard.Router())
 	r.Mount("/upload", upload.Router())
+	r.Mount("/classifier", webClassifier.Router())
 
 	staticFS := http.FileServer(http.Dir("./internal/web/dist"))
 	r.Handle("/assets/*", http.StripPrefix("/assets/", staticFS))

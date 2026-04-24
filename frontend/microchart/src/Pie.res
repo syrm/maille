@@ -16,7 +16,7 @@ type options = {
 
 type chart = {
   slices: array<slice>,
-  options: option<options>,
+  options: options,
 }
 
 let parseSlice = (json: JSON.t): slice =>
@@ -61,8 +61,16 @@ let parseChart = (json: JSON.t): chart =>
     }) =>
     let slices = rawSlices->Array.map(parseSlice)
     let options = switch rawOpts {
-    | None | Some(Null) => None
-    | Some(v) => Some(parseOptions(v))
+    | None | Some(Null) => {
+        width:  None,
+        height: None,
+        donut: false,
+        donutWidth: None,
+        padAngle: None,
+        showLabel: false,
+        colors: None,
+      }
+    | Some(v) => parseOptions(v)
     }
     {slices, options}
   | _ => throw(Core.InvalidJson(Core.InvalidChart("")))

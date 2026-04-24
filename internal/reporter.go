@@ -14,6 +14,7 @@ type transactionStatsProvider interface {
 	GetRecentTransactions(context.Context, uint) ([]domain.RecentTransaction, error)
 	BalanceSummary(ctx context.Context) (domain.BalanceSummary, error)
 	NetWorthHistory(ctx context.Context) ([]domain.NetWorthHistory, error)
+	BreakdownCategory(ctx context.Context) ([]domain.BreakdownCategory, error)
 }
 
 type Reporter struct {
@@ -52,4 +53,15 @@ func (r Reporter) NetWorthHistory(ctx context.Context) []domain.NetWorthHistory 
 	}
 
 	return netWorthHistory
+}
+
+func (r Reporter) BreakdownCategory(ctx context.Context) []domain.BreakdownCategory {
+	breakdownCategory, err := r.TransactionStatsProvider.BreakdownCategory(ctx)
+
+	if err != nil {
+		r.Logger.ErrorContext(ctx, "failed to get breakdown category", slog.Any("error", err))
+		return nil
+	}
+
+	return breakdownCategory
 }

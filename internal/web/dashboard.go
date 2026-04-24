@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -20,6 +19,7 @@ type reporterDashboard interface {
 	BalanceSummary(context.Context) domain.BalanceSummary
 	RecentTransactions(context.Context) []domain.RecentTransaction
 	NetWorthHistory(ctx context.Context) []domain.NetWorthHistory
+	BreakdownCategory(ctx context.Context) []domain.BreakdownCategory
 }
 
 type Dashboard struct {
@@ -36,7 +36,7 @@ func (d Dashboard) Router() *chi.Mux {
 	return r
 }
 
-type Series struct {
+type LineSeries struct {
 	Name   string    `json:"name"`
 	Data   []float64 `json:"data"`
 	Color  *string   `json:"color,omitempty"`
@@ -44,7 +44,7 @@ type Series struct {
 	Dashed bool      `json:"dashed"`
 }
 
-type Options struct {
+type LineOptions struct {
 	Width  *float64 `json:"width,omitempty"`
 	Height *float64 `json:"height,omitempty"`
 	Labels []string `json:"labels,omitempty"`
@@ -54,33 +54,54 @@ type Options struct {
 	Colors []string `json:"colors,omitempty"`
 }
 
-type Chart struct {
-	Series  []Series `json:"series"`
-	Options *Options `json:"options,omitempty"`
+type LineChart struct {
+	Series  []LineSeries `json:"series"`
+	Options *LineOptions `json:"options,omitempty"`
+}
+
+type PieSeries struct {
+	Label string  `json:"label"`
+	Value float64 `json:"value"`
+	Color *string `json:"color,omitempty"`
+}
+
+type PieOptions struct {
+	Width      *float64 `json:"width,omitempty"`
+	Height     *float64 `json:"height,omitempty"`
+	Donut      bool     `json:"donut"`
+	DonutWidth *float64 `json:"donutWidth,omitempty"`
+	PadAngle   *float64 `json:"padAngle,omitempty"`
+	ShowLabel  bool     `json:"showLabel"`
+	Colors     []string `json:"colors,omitempty"`
+}
+
+type PieChart struct {
+	Slices  []PieSeries `json:"slices"`
+	Options *PieOptions `json:"options,omitempty"`
 }
 
 func (d Dashboard) Get(w http.ResponseWriter, r *http.Request) {
 	balanceSummary := d.Reporter.BalanceSummary(r.Context())
 	recentTransactions := d.Reporter.RecentTransactions(r.Context())
 	netWorthHistoryData := d.Reporter.NetWorthHistory(r.Context())
+	breakdownCategoryData := d.Reporter.BreakdownCategory(r.Context())
 
 	variables := jet.VarMap{}
 	variables.Set("lang", r.Context().Value(middleware.LangKey))
 	variables.Set("balanceSummary", balanceSummary)
 	variables.Set("recentTransactions", recentTransactions)
-	variables.Set("netWorthHistory", buildChart(r.Context().Value(middleware.LangKey).(string), netWorthHistoryData))
+	variables.Set("netWorthHistory", buildChartLine(r.Context().Value(middleware.LangKey).(string), netWorthHistoryData))
+	variables.Set("breakdownCategory", buildChartPie(breakdownCategoryData))
 
 	if err := d.Renderer.Render(w, "home", variables); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func buildChart(lang string, netWorthHistoryData []domain.NetWorthHistory) Chart {
+func buildChartLine(lang string, netWorthHistoryData []domain.NetWorthHistory) LineChart {
 	if len(netWorthHistoryData) == 0 {
-		return Chart{}
+		return LineChart{}
 	}
-
-	println(fmt.Sprintf("netWorthHistoryData: %+v", netWorthHistoryData))
 
 	labelsDate := netWorthHistoryData[0].Dates
 	labels := make([]string, len(labelsDate))
@@ -88,7 +109,7 @@ func buildChart(lang string, netWorthHistoryData []domain.NetWorthHistory) Chart
 		labels[i] = monday.Format(date, "Jan", monday.Locale(lang))
 	}
 
-	series := make([]Series, 0, len(netWorthHistoryData))
+	series := make([]LineSeries, 0, len(netWorthHistoryData))
 	for _, netWorthHistory := range netWorthHistoryData {
 		values := make([]float64, len(netWorthHistory.Amounts))
 		for i, amount := range netWorthHistory.Amounts {
@@ -99,20 +120,50 @@ func buildChart(lang string, netWorthHistoryData []domain.NetWorthHistory) Chart
 			values[i] = f
 		}
 
-		series = append(series, Series{
+		series = append(series, LineSeries{
 			Name: netWorthHistory.Name,
 			Data: values,
 		})
 	}
 
-	netWorthHistory := Chart{
-		Options: &Options{
+	netWorthHistory := LineChart{
+		Options: &LineOptions{
 			Labels: labels,
+			Width:  new(712.),
+			Height: new(240.),
 		},
 		Series: series,
 	}
 
-	println(fmt.Sprintf("netWorthHistory: %+v", netWorthHistory))
+	// heu et le marshall ?
 
 	return netWorthHistory
+}
+
+func buildChartPie(breakdownCategoryData []domain.BreakdownCategory) PieChart {
+	if len(breakdownCategoryData) == 0 {
+		return PieChart{}
+	}
+
+	slices := make([]PieSeries, 0, len(breakdownCategoryData))
+	for _, breakdownCategory := range breakdownCategoryData {
+		f, err := strconv.ParseFloat(breakdownCategory.Amount.Number(), 64)
+		if err != nil {
+			continue
+		}
+
+		slices = append(slices, PieSeries{
+			Label: breakdownCategory.Name,
+			Value: f,
+		})
+	}
+
+	return PieChart{
+		Slices: slices,
+		Options: &PieOptions{
+			Donut:  true,
+			Width:  new(160.),
+			Height: new(160.),
+		},
+	}
 }

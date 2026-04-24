@@ -54,8 +54,22 @@
       </div>
     </div>
     <div class="chart-wrap" id="net-worth-history-chart"></div>
-    <script type="application/json" id="app-data">
+    <script type="application/json" id="app-data-net-worth-history">
       {{ raw(json(netWorthHistory)) }}
+    </script>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Répartition par catégorie</div>
+        <div class="card-sub">Poids de chaque poche</div>
+      </div>
+    </div>
+    <div class="donut-wrap" id="breakdown-category-chart"></div>
+    <div class="donut-legend">asrendarsend rsaend rasden rased</div>
+    <script type="application/json" id="app-data-breakdown-category">
+      {{ raw(json(breakdownCategory)) }}
     </script>
   </div>
 </div>

@@ -518,3 +518,51 @@ ORDER BY name`,
 
 	return netWorthHistory, nil
 }
+
+func (t *Transaction) BreakdownCategory(ctx context.Context) ([]domain.BreakdownCategory, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.BreakdownCategory")
+	defer span.End()
+
+	var breakdownCategories []domain.BreakdownCategory
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "get breakdown category"),
+		`SELECT a.alias as name, COALESCE(CAST(ROUND(SUM((amount).number)) AS bigint), 0) AS amount
+		FROM account AS a
+		INNER JOIN posting ON posting.account_id = a.id
+		WHERE type = 'Expenses'
+		GROUP BY a.id`,
+	)
+
+	if errQuery != nil {
+		return breakdownCategories, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to get breakdown category")
+	}
+
+	dtos, errCollect := pgx.CollectRows(rows, pgx.RowToStructByName[dto.BreakdownCategory])
+
+	if errCollect != nil {
+		return breakdownCategories, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errCollect, "failed to collect rows breakdown category")
+	}
+
+	for _, dbBreakdownCategory := range dtos {
+		amountCurr, errCurr := pkgcurrency.NewAmount(strconv.FormatFloat(dbBreakdownCategory.Amount, 'f', 2, 64), "EUR")
+		if errCurr != nil {
+			return breakdownCategories, oops.
+				In("postgres.transaction").
+				WithContext(ctx).
+				Wrapf(errCurr, "failed to create currency for amount %f", dbBreakdownCategory.Amount)
+		}
+		breakdownCategories = append(breakdownCategories, domain.BreakdownCategory{
+			Name:   dbBreakdownCategory.Name,
+			Amount: amountCurr,
+		})
+	}
+
+	return breakdownCategories, nil
+}
