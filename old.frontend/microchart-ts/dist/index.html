@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>microchart — demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+    body {
+      background: #0d1117; color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 2rem; min-height: 100vh;
+    }
+    .page { max-width: 1100px; margin: 0 auto }
+
+    header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem }
+    header h1 { font-size: 1.4rem; font-weight: 700 }
+    header h1 span { color: #58a6ff }
+    header p { font-size: 0.82rem; color: #8b949e; margin-top: 0.2rem }
+
+    .badges { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center }
+    .badge { font-size: .72rem; font-weight: 600; padding: .2rem .55rem; border-radius: 20px; letter-spacing: .03em }
+    .badge.g { background: #1a3626; color: #3fb950; border: 1px solid #2d5a3d }
+    .badge.b { background: #0d2040; color: #58a6ff; border: 1px solid #1a3a6e }
+    .badge.y { background: #2d1f00; color: #f0883e; border: 1px solid #5a3a00 }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem }
+    .span2 { grid-column: span 2 }
+
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1.25rem }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem }
+    .card-header h2 { font-size: .85rem; font-weight: 600; color: #c9d1d9 }
+    .tag { font-size: .68rem; font-weight: 500; padding: .18rem .5rem; border-radius: 4px; background: #21262d; color: #8b949e; font-family: monospace }
+    .chart { width: 100%; height: 240px }
+    .chart-sm { width: 100%; height: 220px }
+
+    .legend { display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin-top: .75rem }
+    .legend-item { display: flex; align-items: center; gap: .35rem; font-size: .73rem; color: #8b949e }
+    .legend-item i { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0 }
+
+    @media (max-width: 680px) {
+      .grid { grid-template-columns: 1fr }
+      .span2 { grid-column: span 1 }
+    }
+  </style>
+  <script type="module" crossorigin>(function(){const n=document.createElement("link").relList;if(n&&n.supports&&n.supports("modulepreload"))return;for(const a of document.querySelectorAll('link[rel="modulepreload"]'))l(a);new MutationObserver(a=>{for(const o of a)if(o.type==="childList")for(const b of o.addedNodes)b.tagName==="LINK"&&b.rel==="modulepreload"&&l(b)}).observe(document,{childList:!0,subtree:!0});function e(a){const o={};return a.integrity&&(o.integrity=a.integrity),a.referrerPolicy&&(o.referrerPolicy=a.referrerPolicy),a.crossOrigin==="use-credentials"?o.credentials="include":a.crossOrigin==="anonymous"?o.credentials="omit":o.credentials="same-origin",o}function l(a){if(a.ep)return;a.ep=!0;const o=e(a);fetch(a.href,o)}})();const Q="http://www.w3.org/2000/svg";function g(t,n={},e){const l=document.createElementNS(Q,t);for(const[a,o]of Object.entries(n))l.setAttribute(a,String(o));return e==null||e.appendChild(l),l}function V(t,n,e){return t.innerHTML="",g("svg",{viewBox:`0 0 ${n} ${e}`,width:"100%",height:"100%",style:"display:block;overflow:visible"},t)}function z(t,n,e={}){const l=g("text",e,t);return l.textContent=n,l}function F(){const t=document.createElement("div");return Object.assign(t.style,{position:"fixed",pointerEvents:"none",opacity:"0",background:"#1c2128",border:"1px solid #30363d",borderRadius:"6px",padding:"5px 10px",fontSize:"12px",color:"#e6edf3",transition:"opacity .15s",zIndex:"9999",whiteSpace:"nowrap"}),document.body.appendChild(t),t}function D(t,n,e){t.innerHTML=n,t.style.opacity="1",N(t,e)}function N(t,n){const e=n.clientX+12,l=n.clientY-28;t.style.left=e+"px",t.style.top=l+"px"}function j(t){t.style.opacity="0"}function Z(t){const n=Math.max(...t);if(n===0)return 10;const e=Math.pow(10,Math.floor(Math.log10(n)));return Math.ceil(n/e)*e}function _(t,n,e){return Array.from({length:e},(l,a)=>t+a/(e-1)*(n-t))}function A(t){return Math.abs(t)>=1e6?(t/1e6).toFixed(1)+"M":Math.abs(t)>=1e3?(t/1e3).toFixed(1)+"K":Number.isInteger(t)?String(t):t.toFixed(2)}const C=["#58a6ff","#3fb950","#f0883e","#a371f7","#f85149","#39d353","#ffa657","#79c0ff"];function R(t,n,e={}){var f;const l=e.width??(t.clientWidth||400),a=e.height??(t.clientHeight||260),o={top:20,right:16,bottom:36,left:44,...e.padding},b=e.colors??C,P=e.yTicks??5,k=e.gap??.25,E=Math.max(...n.map(i=>i.data.length)),$=e.labels??Array.from({length:E},(i,r)=>String(r+1)),w=n.flatMap(i=>i.data),L=Z(w),x=l-o.left-o.right,h=a-o.top-o.bottom,v=V(t,l,a),p=g("g",{transform:`translate(${o.left},${o.top})`},v),y=_(0,L,P);for(const i of y){const r=h-i/L*h;g("line",{x1:0,y1:r,x2:x,y2:r,stroke:"#21262d","stroke-width":1},p),z(p,A(i),{x:-6,y:r+4,"text-anchor":"end",fill:"#8b949e","font-size":11})}const T=x/E,u=T*(1-k),M=u/n.length,s=((f=e.tooltip)==null?void 0:f.enabled)!==!1?F():null;for(let i=0;i<E;i++){const r=i*T+T*k/2;z(p,$[i],{x:r+u/2,y:h+18,"text-anchor":"middle",fill:"#8b949e","font-size":11});for(let d=0;d<n.length;d++){const c=n[d].data[i]??0,m=r+d*M,H=c/L*h,I=n[d].color??b[d%b.length],W=n[d].name,S=g("rect",{x:m,y:h-H,width:M-1,height:H,fill:I,rx:2,style:"cursor:pointer"},p);s&&(S.addEventListener("mouseenter",B=>D(s,`<b style="color:${I}">${W}</b><br/>${$[i]}: <b>${A(c)}</b>`,B)),S.addEventListener("mousemove",B=>N(s,B)),S.addEventListener("mouseleave",()=>j(s)))}}return g("line",{x1:0,y1:h,x2:x,y2:h,stroke:"#30363d","stroke-width":1},p),()=>s==null?void 0:s.remove()}function K(t,n,e={}){var M;const l=e.width??(t.clientWidth||400),a=e.height??(t.clientHeight||220),o={top:20,right:16,bottom:36,left:44,...e.padding},b=e.colors??C,P=e.yTicks??5,k=e.smooth??!0,E=e.points??!0,$=Math.max(...n.map(s=>s.data.length)),w=e.labels??Array.from({length:$},(s,f)=>String(f+1)),L=n.flatMap(s=>s.data),x=Z(L),h=l-o.left-o.right,v=a-o.top-o.bottom,p=V(t,l,a),y=g("g",{transform:`translate(${o.left},${o.top})`},p);for(const s of _(0,x,P)){const f=v-s/x*v;g("line",{x1:0,y1:f,x2:h,y2:f,stroke:"#21262d","stroke-width":1},y),z(y,A(s),{x:-6,y:f+4,"text-anchor":"end",fill:"#8b949e","font-size":11})}const T=h/($-1);for(let s=0;s<$;s++)z(y,w[s],{x:s*T,y:v+18,"text-anchor":"middle",fill:"#8b949e","font-size":11});const u=((M=e.tooltip)==null?void 0:M.enabled)!==!1?F():null;for(let s=0;s<n.length;s++){const f=n[s],i=f.color??b[s%b.length],r=f.data.map((c,m)=>[m*T,v-c/x*v]);let d="";if(k&&r.length>2){d=`M${r[0][0]},${r[0][1]}`;for(let c=1;c<r.length;c++){const[m,H]=r[c-1],[I,W]=r[c],S=(m+I)/2;d+=` C${S},${H} ${S},${W} ${I},${W}`}}else d=r.map((c,m)=>`${m?"L":"M"}${c[0]},${c[1]}`).join(" ");if(f.area&&g("path",{d:`${d} L${r.at(-1)[0]},${v} L${r[0][0]},${v} Z`,fill:i,opacity:.12,stroke:"none"},y),g("path",{d,fill:"none",stroke:i,"stroke-width":2,...f.dashed?{"stroke-dasharray":"5,3"}:{}},y),E||u)for(let c=0;c<r.length;c++){const[m,H]=r[c],I=f.data[c],W=f.name;if(E&&g("circle",{cx:m,cy:H,r:4,fill:i,stroke:"#0d1117","stroke-width":2},y),u){const S=g("circle",{cx:m,cy:H,r:8,fill:"transparent",style:"cursor:pointer"},y);S.addEventListener("mouseenter",B=>D(u,`<b style="color:${i}">${W}</b><br/>${w[c]}: <b>${A(I)}</b>`,B)),S.addEventListener("mousemove",B=>N(u,B)),S.addEventListener("mouseleave",()=>j(u))}}}return g("line",{x1:0,y1:v,x2:h,y2:v,stroke:"#30363d","stroke-width":1},y),()=>u==null?void 0:u.remove()}function tt(t,n,e,l,a,o=0){const b=t+e*Math.cos(l),P=n+e*Math.sin(l),k=t+e*Math.cos(a),E=n+e*Math.sin(a),$=a-l>Math.PI?1:0;if(o===0)return`M${t},${n} L${b},${P} A${e},${e} 0 ${$},1 ${k},${E} Z`;const w=t+o*Math.cos(a),L=n+o*Math.sin(a),x=t+o*Math.cos(l),h=n+o*Math.sin(l);return`M${b},${P} A${e},${e} 0 ${$},1 ${k},${E}
+          L${w},${L} A${o},${o} 0 ${$},0 ${x},${h} Z`}function U(t,n,e={}){var T;const l=e.width??(t.clientWidth||260),a=e.height??(t.clientHeight||220),o=e.colors??C,b=e.donut??!1,P=e.donutWidth??40,k=e.padAngle??.018,E=e.label!==!1,$=V(t,l,a),w=l/2,L=a/2,x=Math.min(w,L)-8,h=b?x-P:0,v=n.reduce((u,M)=>u+M.value,0),p=((T=e.tooltip)==null?void 0:T.enabled)!==!1?F():null;let y=-Math.PI/2;for(let u=0;u<n.length;u++){const M=n[u],s=M.value/v,f=s*2*Math.PI-k,i=M.color??o[u%o.length],r=y+f/2,d=g("path",{d:tt(w,L,x,y,y+f,h),fill:i,style:"cursor:pointer",stroke:"#0d1117","stroke-width":1},$);if(E&&s>.05){const c=h?(x+h)/2:x*.65,m=w+c*Math.cos(r),H=L+c*Math.sin(r),I=e.label==="value"?String(M.value):Math.round(s*100)+"%",W=g("text",{x:m,y:H,"text-anchor":"middle","dominant-baseline":"middle",fill:"#fff","font-size":11,"font-weight":600,style:"pointer-events:none"},$);W.textContent=I}if(p){const c=Math.round(s*100)+"%";d.addEventListener("mouseenter",m=>D(p,`<b style="color:${i}">${M.label}</b><br/>${c} (${M.value})`,m)),d.addEventListener("mousemove",m=>N(p,m)),d.addEventListener("mouseleave",()=>j(p)),d.addEventListener("mouseenter",()=>d.setAttribute("transform",`translate(${Math.cos(r)*4},${Math.sin(r)*4})`)),d.addEventListener("mouseleave",()=>d.removeAttribute("transform"))}y+=f+k}if(b){const u=g("text",{x:w,y:L,"text-anchor":"middle","dominant-baseline":"middle",fill:"#e6edf3","font-size":14,"font-weight":700},$);u.textContent=v.toLocaleString()}return()=>p==null?void 0:p.remove()}const G=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"];function O(t,n,e){let l=n;return Array.from({length:t},()=>(l+=(Math.random()-.49)*e,+l.toFixed(2)))}const q=[{name:"Produit A",data:[42,58,71,63,89,74,95,82,68,77,91,105]},{name:"Produit B",data:[28,35,41,55,48,62,58,71,83,69,74,88]},{name:"Produit C",data:[15,22,18,31,27,34,29,38,42,35,41,55]}];R(document.getElementById("bar"),q,{labels:G,height:240});const et=document.getElementById("bar-legend");q.forEach((t,n)=>{et.innerHTML+=`<span class="legend-item"><i style="background:${C[n]}"></i>${t.name}</span>`});K(document.getElementById("line"),[{name:"EUR/USD",data:O(12,1.085,.008),area:!0}],{labels:G,height:220});const X=[{label:"Infrastructure",value:34},{label:"Marketing",value:22},{label:"R&D",value:28},{label:"RH",value:10},{label:"Divers",value:6}];U(document.getElementById("pie"),X,{height:220});const nt=document.getElementById("pie-legend");X.forEach((t,n)=>{nt.innerHTML+=`<span class="legend-item"><i style="background:${C[n]}"></i>${t.label} (${t.value}%)</span>`});K(document.getElementById("multi"),[{name:"BTC/1k",data:O(12,42,3)},{name:"ETH/100",data:O(12,22,2),dashed:!0},{name:"SOL",data:O(12,95,7),dashed:!0}],{labels:G,height:220,points:!1});const Y=[{label:"Complété",value:63},{label:"En cours",value:20},{label:"En attente",value:17}];U(document.getElementById("donut"),Y,{donut:!0,donutWidth:45,height:220});const ot=document.getElementById("donut-legend");Y.forEach((t,n)=>{ot.innerHTML+=`<span class="legend-item"><i style="background:${C[n]}"></i>${t.label} (${t.value}%)</span>`});const J=document.getElementById("badges");try{J.innerHTML=`
+    <span class="badge g">✓ ? min</span>
+    <span class="badge b">✓ ? gzip</span>
+    <span class="badge y">SVG · 0 deps</span>
+  `}catch{J.innerHTML='<span class="badge y">SVG · 0 deps</span>'}</script>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>micro<span>chart</span></h1>
+        <p>SVG · zéro dépendance · TypeScript · tree-shakable</p>
+      </div>
+      <div class="badges" id="badges">
+        <span class="badge b">⏳ calcul…</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card span2">
+        <div class="card-header">
+          <h2>Ventes mensuelles — multi-séries</h2>
+          <span class="tag">barChart</span>
+        </div>
+        <div id="bar" class="chart"></div>
+        <div class="legend" id="bar-legend"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Cours EUR/USD — area</h2>
+          <span class="tag">lineChart · area</span>
+        </div>
+        <div id="line" class="chart-sm"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Répartition budget</h2>
+          <span class="tag">pieChart</span>
+        </div>
+        <div id="pie" class="chart-sm"></div>
+        <div class="legend" id="pie-legend"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Multi-séries crypto</h2>
+          <span class="tag">lineChart · dashed</span>
+        </div>
+        <div id="multi" class="chart-sm"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Statut projets</h2>
+          <span class="tag">pieChart · donut</span>
+        </div>
+        <div id="donut" class="chart-sm"></div>
+        <div class="legend" id="donut-legend"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

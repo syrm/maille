@@ -1,0 +1,97 @@
+#Start(1776665604639)
+
+  Warning number 3
+  /mnt/data/src/go/maille/frontend/app/src/Main.res:7:21-28
+
+  5 │ 
+  6 │ let init = () => {
+  7 │   let getEl = id => document->Core.getElementById(id)->Nullable.toOption
+  8 │ 
+  9 │   let appData: option<JSON.t> =
+
+  deprecated: Stdlib.document
+  Use rescript-webapi instead
+
+
+  Warning number 26
+  /mnt/data/src/go/maille/frontend/app/src/Main.res:20:9-15
+
+  18 ┆ let chartData = Line.parseChart(json)
+  19 ┆ 
+  20 ┆ let cleanup = Line.make(
+  21 ┆   el,
+  22 ┆   chartData.series,
+
+  unused variable cleanup.
+
+Fix this by:
+- Deleting the variable if it's not used anymore.
+- Prepending the variable name with `_` (like `_cleanup`) to ignore that the variable is unused.
+- Using the variable somewhere.
+
+
+  Warning number 3
+  /mnt/data/src/go/maille/frontend/microchart/src/Demo.res:19:21-28
+
+  17 │ let init = () => {
+  18 │   // ── Bar
+  19 │   let _bar = switch document->Core.getElementById("bar") {
+  20 │   | Value(element) =>
+  21 │     Bar.make(
+
+  deprecated: Stdlib.document
+  Use rescript-webapi instead
+
+
+  Warning number 3
+  /mnt/data/src/go/maille/frontend/microchart/src/Demo.res:35:22-29
+
+  33 ┆ 
+  34 ┆ // ── Line area
+  35 ┆ let _line = switch document->Core.getElementById("line") {
+  36 ┆ | Value(element) =>
+  37 ┆   Line.make(
+
+  deprecated: Stdlib.document
+  Use rescript-webapi instead
+
+
+  Warning number 3
+  /mnt/data/src/go/maille/frontend/microchart/src/Demo.res:47:21-28
+
+  45 ┆ 
+  46 ┆ // ── Pie
+  47 ┆ let _pie = switch document->Core.getElementById("pie") {
+  48 ┆ | Value(element) =>
+  49 ┆   Pie.make(
+
+  deprecated: Stdlib.document
+  Use rescript-webapi instead
+
+
+  Warning number 3
+  /mnt/data/src/go/maille/frontend/microchart/src/Demo.res:65:23-30
+
+  63 ┆ 
+  64 ┆ // ── Multi line
+  65 ┆ let _multi = switch document->Core.getElementById("multi") {
+  66 ┆ | Value(element) =>
+  67 ┆   Line.make(
+
+  deprecated: Stdlib.document
+  Use rescript-webapi instead
+
+
+  Warning number 3
+  /mnt/data/src/go/maille/frontend/microchart/src/Demo.res:81:23-30
+
+  79 ┆ 
+  80 ┆ // ── Donut
+  81 ┆ let _donut = switch document->Core.getElementById("donut") {
+  82 ┆ | Value(element) =>
+  83 ┆   Pie.make(
+
+  deprecated: Stdlib.document
+  Use rescript-webapi instead
+
+#Done(1776665604679)
