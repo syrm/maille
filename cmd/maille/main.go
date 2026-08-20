@@ -202,6 +202,13 @@ func run(
 		Accounts:     accountStore,
 		Logger:       logger,
 	}
+	rules := web.Rules{
+		Renderer: renderer,
+		Rules:    txClassifierRuleStore,
+		Accounts: accountStore,
+		Engine:   classifier,
+		Logger:   logger,
+	}
 
 	r := chi.NewRouter()
 	r.Use(
@@ -211,6 +218,7 @@ func run(
 	r.Use(maillemiddleware.Language)
 	r.Mount("/", dashboard.Router())
 	r.Mount("/transactions", transactions.Router())
+	r.Mount("/rules", rules.Router())
 	r.Mount("/upload", upload.Router())
 	r.Mount("/classifier", webClassifier.Router())
 

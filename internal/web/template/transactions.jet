@@ -1,17 +1,10 @@
 {{ extends "layout.jet" }}
 
 {{ block body() }}
-{{ if notice }}
-<div class="feedback success anim d1" role="status">{{ notice }}</div>
-{{ end }}
-{{ if errorMessage }}
-<div class="feedback error anim d1" role="alert">{{ errorMessage }}</div>
-{{ end }}
-
 <div class="header anim d1">
   <div>
     <h1>Transactions</h1>
-    <p>Consultez et corrigez vos opérations importées.</p>
+    <p>Consultez vos opérations et les catégories appliquées par les règles.</p>
   </div>
   <a class="header-link" href="/upload">Importer un relevé</a>
 </div>
@@ -64,18 +57,7 @@
           {{ if !transaction.Classified }}<small>À catégoriser</small>{{ end }}
         </span>
       </div>
-      <form class="category-form" method="post" action="/transactions/{{ transaction.ID }}/category">
-        <input name="q" type="hidden" value="{{ filter.Search }}">
-        <input name="category" type="hidden" value="{{ filter.CategoryID }}">
-        <input name="review" type="hidden" value="{{ if filter.Uncategorized }}uncategorized{{ end }}">
-        <input name="page" type="hidden" value="{{ page }}">
-        <select aria-label="Catégorie de {{ transaction.Payee }}" name="account_id">
-          {{ range _, category := categories }}
-          <option value="{{ category.ID }}" {{ if transaction.CategoryID == category.ID }}selected{{ end }}>{{ category.Icon }} {{ category.Label }}</option>
-          {{ end }}
-        </select>
-        <button type="submit">Enregistrer</button>
-      </form>
+      <span class="transaction-category">{{ transaction.CategoryIcon }} {{ transaction.CategoryAlias }}</span>
       <span class="transaction-account">{{ transaction.BankAccount }}</span>
       <strong class="transaction-amount {{ if transaction.Amount.IsPositive() }}inc{{ else }}exp{{ end }}">{{ formatMoney(transaction.Amount, lang, 2) }}</strong>
     </article>

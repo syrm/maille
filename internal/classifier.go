@@ -3,10 +3,12 @@ package internal
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	pkgcurrency "github.com/bojanz/currency"
 	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
 
@@ -17,7 +19,7 @@ type transactionEvalCtx struct {
 	Payee     string             `expr:"payee"`
 	Narration string             `expr:"narration"`
 	Date      time.Time          `expr:"date"`
-	DayOfWeek time.Weekday       `expr:"day_of_week"`
+	DayOfWeek int                `expr:"day_of_week"`
 	Month     int                `expr:"month"`
 	Year      int                `expr:"year"`
 	Amount    pkgcurrency.Amount `expr:"amount"`
@@ -39,17 +41,31 @@ type ruleProvider interface {
 	GetAll(context.Context) ([]domain.TransactionClassifierRule, error)
 }
 
-type postingAccountUpdater interface {
-	UpdateAccount(context.Context, uint64, uint64) error
+type postingClassificationUpdater interface {
+	ResetClassifications(context.Context) error
+	ApplyRule(context.Context, uint64, uint64, uint64) error
 }
 
 type Classifier struct {
 	TransactionProvider   transactionProvider
 	RuleProvider          ruleProvider
 	AccountProvider       accountProvider
-	PostingAccountUpdater postingAccountUpdater
+	PostingAccountUpdater postingClassificationUpdater
 	Tracer                trace.Tracer
 	Logger                *slog.Logger
+}
+
+func compileTransactionRule(rule string) (*vm.Program, error) {
+	return expr.Compile(strings.TrimSpace(rule), expr.Env(transactionEvalCtx{}), expr.AsBool())
+}
+
+func (c Classifier) ValidateRule(rule string) error {
+	_, err := compileTransactionRule(rule)
+	return err
+}
+
+func (c Classifier) Reset(ctx context.Context) error {
+	return c.PostingAccountUpdater.ResetClassifications(ctx)
 }
 
 func (c Classifier) Classify(ctx context.Context) error {
@@ -65,7 +81,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 			Wrapf(errRule, "failed to get rules")
 	}
 	for index, r := range rules {
-		pgm, errComp := expr.Compile(r.Rule, expr.Env(transactionEvalCtx{}), expr.AsBool())
+		pgm, errComp := compileTransactionRule(r.Rule)
 
 		if errComp != nil {
 			return oops.
@@ -77,6 +93,12 @@ func (c Classifier) Classify(ctx context.Context) error {
 
 		r.Program = pgm
 		rules[index] = r
+	}
+	if err := c.Reset(ctx); err != nil {
+		return oops.
+			In("Classifier").
+			WithContext(ctx).
+			Wrapf(err, "failed to reset previous classifications")
 	}
 
 	txs, errTx := c.TransactionProvider.GetAllToClassify(ctx, 0, 100_000)
@@ -91,8 +113,9 @@ func (c Classifier) Classify(ctx context.Context) error {
 	for _, tx := range txs {
 		posting := transactionEvalCtx{
 			Payee:             tx.Payee,
+			Narration:         tx.Narration,
 			Date:              tx.Date,
-			DayOfWeek:         tx.Date.Weekday(),
+			DayOfWeek:         int(tx.Date.Weekday()),
 			Month:             int(tx.Date.Month()),
 			Year:              tx.Date.Year(),
 			Amount:            tx.Amount,
@@ -109,7 +132,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 			}
 
 			if result.(bool) {
-				err := c.PostingAccountUpdater.UpdateAccount(ctx, posting.PostingIDToUpdate, rule.Account.ID)
+				err := c.PostingAccountUpdater.ApplyRule(ctx, posting.PostingIDToUpdate, rule.ID, rule.Account.ID)
 				if err != nil {
 					return err
 				}

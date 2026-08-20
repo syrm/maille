@@ -35,6 +35,7 @@ type TransactionParsed struct {
 	ID            string
 	Type          TransactionParsedType
 	Payee         string
+	Narration     string
 	Date          time.Time
 	Amount        pkgcurrency.Amount
 	BankAccountID string
@@ -76,8 +77,9 @@ func (p Parser) parseBlock(ctx context.Context, block string, currency string, b
 	tx.Date = date
 
 	tx.Payee = p.extractTag(block, "NAME")
+	tx.Narration = p.extractTag(block, "MEMO")
 	if tx.Payee == "" {
-		tx.Payee = p.extractTag(block, "MEMO")
+		tx.Payee = tx.Narration
 	}
 	if tx.Payee == "" {
 		return tx, p.oops(ctx).Errorf("transaction payee is missing")

@@ -19,17 +19,22 @@ type Classifier struct {
 func (c Classifier) Router() *chi.Mux {
 	r := chi.NewRouter()
 	r.Get("/", c.Get)
+	r.Post("/", c.Post)
 
 	return r
 }
 
 func (c Classifier) Get(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/rules", http.StatusSeeOther)
+}
+
+func (c Classifier) Post(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	errClass := c.Classifier.Classify(ctx)
 	if errClass != nil {
 		c.Logger.ErrorContext(r.Context(), "failed to classify transaction", slog.Any("error", errClass))
-		w.Write([]byte("pas good"))
+		http.Redirect(w, r, "/rules?error=run-failed", http.StatusSeeOther)
 		return
-		// @TODO redirection
 	}
+	http.Redirect(w, r, "/rules?status=ran", http.StatusSeeOther)
 }

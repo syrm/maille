@@ -19,7 +19,6 @@ const transactionsPerPage = 25
 
 type transactionManager interface {
 	List(context.Context, domain.TransactionListFilter) ([]domain.TransactionListItem, uint64, error)
-	UpdateCategory(context.Context, uint64, uint64) error
 }
 
 type categoryProvider interface {
@@ -44,16 +43,9 @@ type transactionPagination struct {
 	NextURL     string
 }
 
-type transactionCategory struct {
-	ID    uint64
-	Label string
-	Icon  string
-}
-
 func (t Transactions) Router() *chi.Mux {
 	r := chi.NewRouter()
 	r.Get("/", t.Get)
-	r.Post("/{transactionID}/category", t.PostCategory)
 	return r
 }
 
@@ -66,7 +58,7 @@ func (t Transactions) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if page > 1 && len(transactions) == 0 {
-		http.Redirect(w, r, transactionListURL(filter, 1, "", ""), http.StatusSeeOther)
+		http.Redirect(w, r, transactionListURL(filter, 1), http.StatusSeeOther)
 		return
 	}
 
@@ -76,23 +68,7 @@ func (t Transactions) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Impossible de charger les catégories.", http.StatusInternalServerError)
 		return
 	}
-	categoryAccounts := make([]domain.Account, 0, len(accounts))
-	aliases := make(map[string]int)
-	for _, account := range accounts {
-		if account.Type == domain.AccountTypeExpenses || account.Type == domain.AccountTypeIncome {
-			categoryAccounts = append(categoryAccounts, account)
-			aliases[account.Alias]++
-		}
-	}
-	categories := make([]transactionCategory, 0, len(categoryAccounts))
-	for _, account := range categoryAccounts {
-		label := account.Alias
-		if aliases[account.Alias] > 1 {
-			nameParts := strings.Split(account.Name, ":")
-			label += " · " + nameParts[len(nameParts)-1]
-		}
-		categories = append(categories, transactionCategory{ID: account.ID, Label: label, Icon: account.Icon})
-	}
+	categories := categoryOptions(accounts)
 
 	pagination := buildTransactionPagination(filter, page, total, uint64(len(transactions)))
 	variables := jet.VarMap{}
@@ -103,36 +79,12 @@ func (t Transactions) Get(w http.ResponseWriter, r *http.Request) {
 	variables.Set("hasTransactions", len(transactions) > 0)
 	variables.Set("categories", categories)
 	variables.Set("filter", filter)
-	variables.Set("page", page)
 	variables.Set("pagination", pagination)
-	variables.Set("notice", transactionNotice(r.URL.Query().Get("status")))
-	variables.Set("errorMessage", transactionError(r.URL.Query().Get("error")))
 
 	if err := t.Renderer.Render(w, "transactions", variables); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
-
-func (t Transactions) PostCategory(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		redirectTransactionResult(w, r, "", "invalid-category")
-		return
-	}
-	transactionID, errTransactionID := strconv.ParseUint(chi.URLParam(r, "transactionID"), 10, 64)
-	accountID, errAccountID := strconv.ParseUint(r.FormValue("account_id"), 10, 64)
-	if errTransactionID != nil || transactionID == 0 || errAccountID != nil || accountID == 0 {
-		redirectTransactionResult(w, r, "", "invalid-category")
-		return
-	}
-
-	if err := t.Transactions.UpdateCategory(r.Context(), transactionID, accountID); err != nil {
-		t.Logger.ErrorContext(r.Context(), "failed to update transaction category", slog.Any("error", err))
-		redirectTransactionResult(w, r, "", "update-failed")
-		return
-	}
-	redirectTransactionResult(w, r, "updated", "")
-}
-
 func parseTransactionFilter(values url.Values) (domain.TransactionListFilter, uint64) {
 	search := strings.TrimSpace(values.Get("q"))
 	searchRunes := []rune(search)
@@ -165,21 +117,16 @@ func buildTransactionPagination(filter domain.TransactionListFilter, page, total
 	}
 	if page > 1 {
 		pagination.HasPrevious = true
-		pagination.PreviousURL = transactionListURL(filter, page-1, "", "")
+		pagination.PreviousURL = transactionListURL(filter, page-1)
 	}
 	if offset+count < total {
 		pagination.HasNext = true
-		pagination.NextURL = transactionListURL(filter, page+1, "", "")
+		pagination.NextURL = transactionListURL(filter, page+1)
 	}
 	return pagination
 }
 
-func redirectTransactionResult(w http.ResponseWriter, r *http.Request, status, errorCode string) {
-	filter, page := parseTransactionFilter(r.PostForm)
-	http.Redirect(w, r, transactionListURL(filter, page, status, errorCode), http.StatusSeeOther)
-}
-
-func transactionListURL(filter domain.TransactionListFilter, page uint64, status, errorCode string) string {
+func transactionListURL(filter domain.TransactionListFilter, page uint64) string {
 	query := url.Values{}
 	if filter.Search != "" {
 		query.Set("q", filter.Search)
@@ -193,32 +140,8 @@ func transactionListURL(filter domain.TransactionListFilter, page uint64, status
 	if page > 1 {
 		query.Set("page", strconv.FormatUint(page, 10))
 	}
-	if status != "" {
-		query.Set("status", status)
-	}
-	if errorCode != "" {
-		query.Set("error", errorCode)
-	}
 	if len(query) == 0 {
 		return "/transactions"
 	}
 	return "/transactions?" + query.Encode()
-}
-
-func transactionNotice(status string) string {
-	if status == "updated" {
-		return "Catégorie mise à jour."
-	}
-	return ""
-}
-
-func transactionError(code string) string {
-	switch code {
-	case "invalid-category":
-		return "La catégorie sélectionnée est invalide."
-	case "update-failed":
-		return "La catégorie n’a pas pu être mise à jour."
-	default:
-		return ""
-	}
 }

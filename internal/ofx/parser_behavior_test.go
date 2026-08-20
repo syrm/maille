@@ -56,7 +56,7 @@ func TestParserParse(t *testing.T) {
 	if got := transactions[0]; got.ID != "tx-debit-1" || got.BankAccountID != "123456789" || got.Payee != "AMAZON" || got.Amount.Number() != "-42.50" {
 		t.Errorf("first transaction = %#v", got)
 	}
-	if got := transactions[1]; got.Type != TransactionParsedCredit || got.Payee != "VIR SEPA SALAIRE ENTREPRISE A" || got.Date.Day() != 20 {
+	if got := transactions[1]; got.Type != TransactionParsedCredit || got.Payee != "VIR SEPA SALAIRE ENTREPRISE A" || got.Narration != "VIR SEPA SALAIRE ENTREPRISE A" || got.Date.Day() != 20 {
 		t.Errorf("second transaction = %#v", got)
 	}
 }
