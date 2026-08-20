@@ -90,6 +90,7 @@ func (d Dashboard) Get(w http.ResponseWriter, r *http.Request) {
 
 	variables := jet.VarMap{}
 	variables.Set("lang", r.Context().Value(middleware.LangKey))
+	variables.Set("pageTitle", "Tableau de bord")
 	variables.Set("currentPage", "dashboard")
 	variables.Set("notice", importNotice(r))
 	variables.Set("warning", importWarning(r))

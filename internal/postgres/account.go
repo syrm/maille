@@ -29,7 +29,7 @@ func (a *Account) GetAll(ctx context.Context) ([]domain.Account, error) {
 
 	rows, errQuery := a.pool.Query(
 		context.WithValue(ctx, SQLName, "get all"),
-		`SELECT id, type, name FROM account`,
+		`SELECT id, type, name, alias, icon, color FROM account ORDER BY type, name`,
 	)
 
 	if errQuery != nil {
@@ -42,7 +42,7 @@ func (a *Account) GetAll(ctx context.Context) ([]domain.Account, error) {
 
 	accounts, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Account, error) {
 		account := domain.Account{}
-		errScan := row.Scan(&account.ID, &account.Type, &account.Name)
+		errScan := row.Scan(&account.ID, &account.Type, &account.Name, &account.Alias, &account.Icon, &account.Color)
 
 		if errScan != nil {
 			return account, oops.

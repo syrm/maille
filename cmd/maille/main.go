@@ -196,6 +196,12 @@ func run(
 		Tracer:   tracerProvider.GetTracer("maille-web"),
 		Logger:   logger,
 	}
+	transactions := web.Transactions{
+		Renderer:     renderer,
+		Transactions: txStore,
+		Accounts:     accountStore,
+		Logger:       logger,
+	}
 
 	r := chi.NewRouter()
 	r.Use(
@@ -204,6 +210,7 @@ func run(
 	r.Use(middleware.Recoverer)
 	r.Use(maillemiddleware.Language)
 	r.Mount("/", dashboard.Router())
+	r.Mount("/transactions", transactions.Router())
 	r.Mount("/upload", upload.Router())
 	r.Mount("/classifier", webClassifier.Router())
 
