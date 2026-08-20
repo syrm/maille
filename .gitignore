@@ -1,6 +1,12 @@
 tmp
 demo-2023-2027.ofx
 demo.ofx
+frontend/build
+frontend/dist
+frontend/manifest.toml
+frontend/.lustre
+.amp/portals
+.amp/postgres
 frontend/lib
 frontend/node_modules
 old.frontend

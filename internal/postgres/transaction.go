@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	pkgcurrency "github.com/bojanz/currency"
 	"github.com/bwmarrin/snowflake"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
@@ -22,6 +24,13 @@ import (
 type Transaction struct {
 	pool   *pgxpool.Pool
 	tracer trace.Tracer
+}
+
+func copyText(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, "\t", `\t`)
+	value = strings.ReplaceAll(value, "\n", `\n`)
+	return strings.ReplaceAll(value, "\r", `\r`)
 }
 
 func BuildTransaction(pool *pgxpool.Pool, tracer trace.Tracer) *Transaction {
@@ -242,11 +251,12 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 
 		// Add transaction to transaction builder
 		date := transaction.Date.Format(time.DateOnly)
-		trSb.WriteString(fmt.Sprintf("%d\t%s\tt\t%s\t%s\n",
+		trSb.WriteString(fmt.Sprintf("%d\t%s\tt\t%s\t%s\t%s\n",
 			transactionID,
 			date,
-			transaction.Payee,
-			transaction.ExternalID))
+			copyText(transaction.Payee),
+			copyText(transaction.ExternalID),
+			copyText(transaction.ExternalID)))
 
 		// Add postings for this transaction using the same transactionID
 		for _, posting := range transaction.Postings {
@@ -278,9 +288,13 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	_, errCopyTr := pgConn.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy transaction"),
 		trReader,
-		"COPY transaction (id, date, completed, payee, external_id) FROM STDIN",
+		"COPY transaction (id, date, completed, payee, external_id, import_key) FROM STDIN",
 	)
 	if errCopyTr != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(errCopyTr, &pgErr) && pgErr.Code == "23505" {
+			return domain.ErrDuplicateTransaction
+		}
 		return oops.
 			In("postgres.transaction").
 			WithContext(ctx).

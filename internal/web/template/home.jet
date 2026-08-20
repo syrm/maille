@@ -1,9 +1,15 @@
 {{ extends "layout.jet" }}
 
 {{ block body() }}
+{{ if notice }}
+<div class="feedback success anim d1" role="status">{{ notice }}</div>
+{{ end }}
+{{ if warning }}
+<div class="feedback warning anim d1" role="alert">{{ warning }}</div>
+{{ end }}
 <div class="header anim d1">
   <div><h1>Tableau de bord</h1>
-    <p>Dernière mise à jour : 6 février 2026, 14:32</p></div>
+    <p>Vue d’ensemble de vos finances</p></div>
   <div class="header-actions">
     <div class="period-sel">
       <button class="period-btn">7J</button>
@@ -25,19 +31,19 @@
   <div class="card bal-card main-bal">
     <div class="bal-label"><span class="dot" style="background:var(--green)"></span> Solde global</div>
     <div class="bal-value">{{ formatMoney(balanceSummary.TotalBalance, lang, 0) }}</div>
-    <span class="badge up">↑ ? % ce mois</span></div>
+    <span class="badge neutral">Solde actuel</span></div>
   <div class="card bal-card">
     <div class="bal-label"><span class="dot" style="background:var(--blue)"></span> Comptes courants</div>
     <div class="bal-value">{{ formatMoney(balanceSummary.CheckingBalance, lang, 0) }}</div>
-    <span class="badge up">↑ ? €</span></div>
+    <span class="badge neutral">Solde actuel</span></div>
   <div class="card bal-card">
     <div class="bal-label"><span class="dot" style="background:var(--purple)"></span> Épargne</div>
     <div class="bal-value">{{ formatMoney(balanceSummary.SavingsBalance, lang, 0) }}</div>
-    <span class="badge up">↑ ? %</span></div>
+    <span class="badge neutral">Solde actuel</span></div>
   <div class="card bal-card">
     <div class="bal-label"><span class="dot" style="background:var(--amber)"></span> Investissements</div>
     <div class="bal-value">{{ formatMoney(balanceSummary.InvestmentBalance, lang, 0) }}</div>
-    <span class="badge down">↓ ? %</span></div>
+    <span class="badge neutral">Solde actuel</span></div>
 </div>
 
 <div class="row-2 anim d3">
@@ -53,10 +59,18 @@
         <div class="legend-tag"><span style="background:var(--amber)"></span> Invest.</div>
       </div>
     </div>
+    {{ if hasNetWorthHistory }}
     <div class="chart-wrap" id="net-worth-history-chart"></div>
     <script type="application/json" id="app-data-net-worth-history">
       {{ raw(json(netWorthHistory)) }}
     </script>
+    {{ else }}
+    <div class="empty-state chart-empty">
+      <span class="empty-icon">↗</span>
+      <strong>Pas encore d’historique</strong>
+      <span>Importez un relevé pour suivre votre patrimoine.</span>
+    </div>
+    {{ end }}
   </div>
 
   <div class="card">
@@ -66,11 +80,29 @@
         <div class="card-sub">Poids de chaque poche</div>
       </div>
     </div>
-    <div class="donut-wrap" id="breakdown-category-chart"></div>
-    <div class="donut-legend">asrendarsend rsaend rasden rased</div>
+    {{ if hasBreakdownCategory }}
+    <div class="donut-layout">
+      <div class="donut-wrap" id="breakdown-category-chart"></div>
+      <div class="donut-legend">
+        {{ range _, category := breakdownCategories }}
+        <div class="dl-item">
+          <span class="dl-dot"></span>
+          <span class="dl-name">{{ category.Name }}</span>
+          <span class="dl-val">{{ formatMoney(category.Amount, lang, 0) }}</span>
+        </div>
+        {{ end }}
+      </div>
+    </div>
     <script type="application/json" id="app-data-breakdown-category">
       {{ raw(json(breakdownCategory)) }}
     </script>
+    {{ else }}
+    <div class="empty-state chart-empty">
+      <span class="empty-icon">◌</span>
+      <strong>Aucune dépense catégorisée</strong>
+      <span>La répartition apparaîtra après votre premier import.</span>
+    </div>
+    {{ end }}
   </div>
 </div>
 
@@ -83,6 +115,7 @@
     </div>
   </div>
   <div id="txList">
+    {{ if hasRecentTransactions }}
     {{ range id, transaction := recentTransactions }}
     <div class="tx-item">
       <div class="tx-icon" style="background:{{ transaction.Color }}">{{ transaction.Icon }}</div>
@@ -94,6 +127,14 @@
         <div class="tx-amt {{ if transaction.Amount.IsPositive() }}inc{{ else }}exp{{ end }}">{{ formatMoney(transaction.Amount, lang, 2) }}</div>
         <div class="tx-date">{{ shortDate(transaction.Date, lang) }}</div>
       </div>
+    </div>
+    {{ end }}
+    {{ else }}
+    <div class="empty-state transactions-empty">
+      <span class="empty-icon">↓</span>
+      <strong>Aucune transaction</strong>
+      <span>Importez votre premier relevé OFX.</span>
+      <a class="empty-action" href="/upload">Importer un relevé</a>
     </div>
     {{ end }}
   </div>

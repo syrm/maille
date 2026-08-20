@@ -85,17 +85,47 @@ func (d Dashboard) Get(w http.ResponseWriter, r *http.Request) {
 	recentTransactions := d.Reporter.RecentTransactions(r.Context())
 	netWorthHistoryData := d.Reporter.NetWorthHistory(r.Context())
 	breakdownCategoryData := d.Reporter.BreakdownCategory(r.Context())
+	netWorthHistory := buildChartLine(r.Context().Value(middleware.LangKey).(string), netWorthHistoryData)
+	breakdownCategory := buildChartPie(breakdownCategoryData)
 
 	variables := jet.VarMap{}
 	variables.Set("lang", r.Context().Value(middleware.LangKey))
+	variables.Set("currentPage", "dashboard")
+	variables.Set("notice", importNotice(r))
+	variables.Set("warning", importWarning(r))
 	variables.Set("balanceSummary", balanceSummary)
 	variables.Set("recentTransactions", recentTransactions)
-	variables.Set("netWorthHistory", buildChartLine(r.Context().Value(middleware.LangKey).(string), netWorthHistoryData))
-	variables.Set("breakdownCategory", buildChartPie(breakdownCategoryData))
+	variables.Set("hasRecentTransactions", len(recentTransactions) > 0)
+	variables.Set("netWorthHistory", netWorthHistory)
+	variables.Set("hasNetWorthHistory", len(netWorthHistory.Series) > 0)
+	variables.Set("breakdownCategory", breakdownCategory)
+	variables.Set("breakdownCategories", breakdownCategoryData)
+	variables.Set("hasBreakdownCategory", len(breakdownCategory.Slices) > 0)
 
 	if err := d.Renderer.Render(w, "home", variables); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func importNotice(r *http.Request) string {
+	if r.URL.Query().Get("status") != "imported" {
+		return ""
+	}
+	count, err := strconv.Atoi(r.URL.Query().Get("count"))
+	if err != nil || count < 1 {
+		return "Import terminé."
+	}
+	if count == 1 {
+		return "1 transaction importée avec succès."
+	}
+	return strconv.Itoa(count) + " transactions importées avec succès."
+}
+
+func importWarning(r *http.Request) string {
+	if r.URL.Query().Get("warning") == "classification" {
+		return "Les transactions ont été importées, mais leur catégorisation automatique doit être relancée."
+	}
+	return ""
 }
 
 func buildChartLine(lang string, netWorthHistoryData []domain.NetWorthHistory) LineChart {
@@ -110,6 +140,7 @@ func buildChartLine(lang string, netWorthHistoryData []domain.NetWorthHistory) L
 	}
 
 	series := make([]LineSeries, 0, len(netWorthHistoryData))
+	hasData := false
 	for _, netWorthHistory := range netWorthHistoryData {
 		values := make([]float64, len(netWorthHistory.Amounts))
 		for i, amount := range netWorthHistory.Amounts {
@@ -118,12 +149,16 @@ func buildChartLine(lang string, netWorthHistoryData []domain.NetWorthHistory) L
 				continue
 			}
 			values[i] = f
+			hasData = hasData || f != 0
 		}
 
 		series = append(series, LineSeries{
 			Name: netWorthHistory.Name,
 			Data: values,
 		})
+	}
+	if !hasData {
+		return LineChart{}
 	}
 
 	netWorthHistory := LineChart{

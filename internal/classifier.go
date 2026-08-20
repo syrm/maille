@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -56,24 +55,8 @@ type Classifier struct {
 func (c Classifier) Classify(ctx context.Context) error {
 	ctx, span := c.Tracer.Start(ctx, "Classifier")
 	defer span.End()
-	println("CLASSIFY")
-	//accountsID := make(map[uint64]string)
-	//{
-	//	accounts, errAccount := c.AccountProvider.GetAll(ctx)
-	//	if errAccount != nil {
-	//		return oops.
-	//			In("Classifier").
-	//			WithContext(ctx).
-	//			Wrapf(errAccount, "failed to get accounts")
-	//	}
-	//
-	//	for _, account := range accounts {
-	//		accountsID[account.ID] = string(account.Type) + ":" + account.Name
-	//	}
-	//}
 
 	rules, errRule := c.RuleProvider.GetAll(ctx)
-	println("CLASSIFY 2")
 
 	if errRule != nil {
 		return oops.
@@ -81,10 +64,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 			WithContext(ctx).
 			Wrapf(errRule, "failed to get rules")
 	}
-	println("CLASSIFY 3")
-
 	for index, r := range rules {
-		fmt.Printf("Rule %#v\n", r)
 		pgm, errComp := expr.Compile(r.Rule, expr.Env(transactionEvalCtx{}), expr.AsBool())
 
 		if errComp != nil {
@@ -100,7 +80,6 @@ func (c Classifier) Classify(ctx context.Context) error {
 	}
 
 	txs, errTx := c.TransactionProvider.GetAllToClassify(ctx, 0, 100_000)
-	println("CLASSIFY 4", len(txs))
 
 	if errTx != nil {
 		return oops.
@@ -109,17 +88,7 @@ func (c Classifier) Classify(ctx context.Context) error {
 			Wrapf(errTx, "failed to get transactions")
 	}
 
-	println("CLASSIFY 5")
-
 	for _, tx := range txs {
-		//accountID := tx.AccountID
-		//accountName, ok := accountsID[accountID]
-
-		//if !ok {
-		//	c.Logger.Warn("accountID not found", slog.Uint64("account_id", accountID))
-		//	continue
-		//}
-
 		posting := transactionEvalCtx{
 			Payee:             tx.Payee,
 			Date:              tx.Date,
@@ -132,21 +101,19 @@ func (c Classifier) Classify(ctx context.Context) error {
 			PostingIDToUpdate: tx.PostingID,
 		}
 
-		println(fmt.Sprintf("posting %+v\n", posting))
-
 		for _, rule := range rules {
 			result, errExpr := expr.Run(rule.Program, posting)
 			if errExpr != nil {
-				println(fmt.Sprintf("oups %+v\n", errExpr.Error()))
+				c.Logger.WarnContext(ctx, "failed to evaluate classification rule", slog.Any("error", errExpr))
 				continue
 			}
 
 			if result.(bool) {
-				println("ca match", posting.Payee, posting.Account)
 				err := c.PostingAccountUpdater.UpdateAccount(ctx, posting.PostingIDToUpdate, rule.Account.ID)
 				if err != nil {
 					return err
 				}
+				break
 			}
 		}
 	}
