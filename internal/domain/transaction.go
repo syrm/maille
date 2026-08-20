@@ -1,6 +1,11 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrDuplicateTransaction = errors.New("transaction external identifier already exists")
 
 type Transaction struct {
 	ID                    uint64

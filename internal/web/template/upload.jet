@@ -1,18 +1,29 @@
 {{ extends "layout.jet" }}
 
-{{ block head() }}
-<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
-{{ end }}
-
 {{ block body() }}
-<h1>Upload OFX 3</h1>
-<form method="post" enctype="multipart/form-data">
+<div class="header anim d1">
   <div>
-    <label for="file">Choose file to upload</label>
-    <input type="file" id="file" name="file" accept=".ofx" size="100MB" />
+    <h1>Importer un relevé</h1>
+    <p>Ajoutez vos transactions depuis un fichier OFX</p>
   </div>
-  <div>
-    <button>Submit</button>
-  </div>
-</form>
+</div>
+
+<div class="upload-shell anim d2">
+  <form class="card upload-card" method="post" enctype="multipart/form-data">
+    {{ if errorMessage }}
+    <div class="feedback error" role="alert">{{ errorMessage }}</div>
+    {{ end }}
+    <div class="upload-icon">
+      <svg fill="none" height="26" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="26"><path d="M12 3v12"></path><polyline points="7 8 12 3 17 8"></polyline><path d="M5 21h14a2 2 0 0 0 2-2v-4"></path><path d="M3 15v4a2 2 0 0 0 2 2"></path></svg>
+    </div>
+    <h2>Sélectionnez votre fichier OFX</h2>
+    <p>Le fichier est traité localement et ses transactions sont automatiquement catégorisées.</p>
+    <label class="file-field" for="file">
+      <span class="file-label">Fichier OFX</span>
+      <input type="file" id="file" name="file" accept=".ofx,application/x-ofx" required />
+    </label>
+    <button class="primary-button" type="submit">Importer les transactions</button>
+    <span class="upload-hint">Taille maximale : 100 Mo</span>
+  </form>
+</div>
 {{ end }}

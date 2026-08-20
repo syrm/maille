@@ -4,15 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"iter"
 	"strings"
 	"time"
 
 	pkgcurrency "github.com/bojanz/currency"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/oops"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -24,6 +23,8 @@ const (
 )
 
 var (
+	ErrNoTransactions = errors.New("OFX file contains no transactions")
+
 	STMTopen     = []byte("<STMTTRN>")
 	STMTopenLen  = len(STMTopen)
 	STMTclose    = []byte("</STMTTRN>")
@@ -43,7 +44,7 @@ type Parser struct {
 	Tracer trace.Tracer
 }
 
-func (p Parser) parseBlock(ctx context.Context, block string, currency string) (TransactionParsed, error) {
+func (p Parser) parseBlock(ctx context.Context, block string, currency string, bankAccountID string) (TransactionParsed, error) {
 	var tx TransactionParsed
 
 	amountRaw := p.extractTag(block, "TRNAMT")
@@ -57,14 +58,15 @@ func (p Parser) parseBlock(ctx context.Context, block string, currency string) (
 	}
 	tx.Amount = amount
 
-	tx.BankAccountID = p.extractTag(block, "DTUSER")
-
-	if tx.BankAccountID == "" {
-		spew.Dump(block, tx)
-	}
+	tx.BankAccountID = bankAccountID
 
 	dateRaw := p.extractTag(block, "DTPOSTED")
-	date, errDate := time.Parse("20060102", dateRaw)
+	if len(dateRaw) < len("20060102") {
+		return tx, p.oops(ctx).
+			With("date", dateRaw).
+			Errorf("failed to parse date")
+	}
+	date, errDate := time.Parse("20060102", dateRaw[:8])
 
 	if errDate != nil {
 		return tx, p.oops(ctx).
@@ -74,15 +76,24 @@ func (p Parser) parseBlock(ctx context.Context, block string, currency string) (
 	tx.Date = date
 
 	tx.Payee = p.extractTag(block, "NAME")
+	if tx.Payee == "" {
+		tx.Payee = p.extractTag(block, "MEMO")
+	}
+	if tx.Payee == "" {
+		return tx, p.oops(ctx).Errorf("transaction payee is missing")
+	}
 
 	tx.ID = p.extractTag(block, "FITID")
+	if tx.ID == "" {
+		return tx, p.oops(ctx).Errorf("transaction identifier is missing")
+	}
 
 	typeRaw := p.extractTag(block, "TRNTYPE")
 
 	switch typeRaw {
-	case "DEBIT":
+	case "DEBIT", "CHECK", "PAYMENT", "CASH", "DIRECTDEBIT", "ATM", "POS", "FEE":
 		tx.Type = TransactionParsedDebit
-	case "CREDIT":
+	case "CREDIT", "DIRECTDEP", "DEP", "INTEREST":
 		tx.Type = TransactionParsedCredit
 	default:
 		return tx, p.oops(ctx).
@@ -102,7 +113,10 @@ func (p Parser) extractTag(block, tag string) string {
 	rest := block[start:]
 	end := strings.Index(rest, "</"+tag+">")
 	if end == -1 {
-		return strings.TrimSpace(rest)
+		end = strings.IndexByte(rest, '<')
+		if end == -1 {
+			return strings.TrimSpace(rest)
+		}
 	}
 	return strings.TrimSpace(rest[:end])
 }
@@ -111,66 +125,40 @@ func (p Parser) oops(ctx context.Context) oops.OopsErrorBuilder {
 	return oops.In("OFXParser").WithContext(ctx)
 }
 
-func (p Parser) getCurrency(ctx context.Context, reader io.Reader) string {
-	ctx, span := p.Tracer.Start(ctx, "getCurrency")
-	defer span.End()
-
-	bufreader := bufio.NewReader(reader)
-
-	currency := "NOP"
-
-	for {
-		data, err := bufreader.ReadBytes('<')
-		if err != nil {
-			return currency
-		}
-
-		if len(data) < 8 {
-			continue
-		}
-
-		if string(data[0:7]) == "CURDEF>" {
-			index := strings.IndexByte(string(data[7:]), '<')
-
-			if index == -1 {
-				return currency
-			}
-
-			return string(data[7 : 7+index])
-		}
-	}
-}
-
 func (p Parser) Parse(orgCtx context.Context, reader io.Reader) iter.Seq2[TransactionParsed, error] {
-	var timeToSplit int64 = 0
-	var countSplit int64 = 0
 	return func(yield func(TransactionParsed, error) bool) {
 		ctx, span := p.Tracer.Start(orgCtx, "Parse")
-		defer func() {
-			span.AddEvent("splitOnStmtTrn", trace.WithAttributes(
-				attribute.Int64("call_count", countSplit),
-				attribute.Float64("total_duration_avg_us", float64(timeToSplit)/float64(countSplit)),
-				attribute.Int64("total_duration_us", timeToSplit),
-			),
-			)
-			span.End()
-		}()
+		defer span.End()
 
-		currency := p.getCurrency(ctx, reader)
-		scanner := bufio.NewScanner(reader)
+		data, errRead := io.ReadAll(reader)
+		if errRead != nil {
+			yield(TransactionParsed{}, p.oops(ctx).Wrapf(errRead, "failed to read OFX file"))
+			return
+		}
+
+		document := string(data)
+		currency := p.extractTag(document, "CURDEF")
+		if currency == "" {
+			yield(TransactionParsed{}, p.oops(ctx).Errorf("OFX currency is missing"))
+			return
+		}
+
+		bankAccountID := p.extractTag(document, "ACCTID")
+		if bankAccountID == "" {
+			bankAccountID = p.extractTag(document, "DTUSER")
+		}
+		if bankAccountID == "" {
+			yield(TransactionParsed{}, p.oops(ctx).Errorf("OFX bank account identifier is missing"))
+			return
+		}
+
+		scanner := bufio.NewScanner(bytes.NewReader(data))
 		scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
+		scanner.Split(p.splitOnStmtTrn)
 
-		scanner.Split(func(data []byte, atEOF bool) (int, []byte, error) {
-			start := time.Now()
-			advance, token, err := p.splitOnStmtTrn(data, atEOF)
-			timeToSplit += time.Since(start).Microseconds()
-			countSplit++
-
-			return advance, token, err
-		})
-
+		count := 0
 		for scanner.Scan() {
-			transaction, errParse := p.parseBlock(ctx, scanner.Text(), currency)
+			transaction, errParse := p.parseBlock(ctx, scanner.Text(), currency, bankAccountID)
 
 			if errParse != nil {
 				yield(TransactionParsed{}, p.oops(ctx).Wrapf(errParse, "failed to process"))
@@ -180,10 +168,15 @@ func (p Parser) Parse(orgCtx context.Context, reader io.Reader) iter.Seq2[Transa
 			if !yield(transaction, nil) {
 				return
 			}
+			count++
 		}
 
 		if err := scanner.Err(); err != nil {
 			yield(TransactionParsed{}, p.oops(ctx).Wrapf(err, "scanner error"))
+			return
+		}
+		if count == 0 {
+			yield(TransactionParsed{}, ErrNoTransactions)
 		}
 	}
 }
@@ -200,7 +193,7 @@ func (p Parser) splitOnStmtTrn(data []byte, atEOF bool) (advance int, token []by
 	end := bytes.Index(data[start:], STMTclose)
 	if end == -1 {
 		if atEOF {
-			return len(data), nil, nil
+			return 0, nil, io.ErrUnexpectedEOF
 		}
 		return 0, nil, nil
 	}

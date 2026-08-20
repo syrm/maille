@@ -2,11 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"io"
 	"iter"
 	"log/slog"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/oops"
 	"go.opentelemetry.io/otel/trace"
 
@@ -18,6 +18,8 @@ var defaultExpenseTransaction = domain.Account{
 	Type: domain.AccountTypeExpenses,
 	Name: "Other",
 }
+
+var ErrDuplicateImport = errors.New("transactions already imported")
 
 type Parser interface {
 	Parse(context.Context, io.Reader) iter.Seq2[ofx.TransactionParsed, error]
@@ -49,14 +51,15 @@ type Importer struct {
 	Logger           *slog.Logger
 }
 
-func (i Importer) Import(ctx context.Context, reader io.Reader) error {
+func (i Importer) Import(ctx context.Context, reader io.Reader) (int, error) {
 	ctx, span := i.Tracer.Start(ctx, "Import")
 	defer span.End()
 
+	var defaultExpenseAccountID uint64
 	{
 		accounts, errAccount := i.AccountStore.GetAll(ctx)
 		if errAccount != nil {
-			return oops.
+			return 0, oops.
 				In("importer").
 				WithContext(ctx).
 				Wrapf(errAccount, "failed to get accounts")
@@ -65,24 +68,30 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 		for _, account := range accounts {
 			if account.Type == defaultExpenseTransaction.Type &&
 				account.Name == defaultExpenseTransaction.Name {
-				defaultExpenseTransaction.ID = account.ID
+				defaultExpenseAccountID = account.ID
 				break
 			}
 		}
+	}
+	if defaultExpenseAccountID == 0 {
+		return 0, oops.
+			In("importer").
+			WithContext(ctx).
+			Errorf("default expense account not found")
 	}
 
 	bankAccountsID := make(map[string]uint64)
 	{
 		bankAccounts, errAccount := i.BankAccountStore.GetAll(ctx)
 		if errAccount != nil {
-			return oops.
+			return 0, oops.
 				In("importer").
 				WithContext(ctx).
 				Wrapf(errAccount, "failed to get bankaccounts")
 		}
 
 		for _, bankAccount := range bankAccounts {
-			bankAccountsID[bankAccount.ExternalID] = bankAccount.ID
+			bankAccountsID[bankAccount.ExternalID] = bankAccount.AccountID
 		}
 	}
 
@@ -91,7 +100,7 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 
 	for transactionParsed, err := range transactionsParsed {
 		if err != nil {
-			return oops.
+			return 0, oops.
 				In("importer").
 				WithContext(ctx).
 				Wrapf(err, "failed to import")
@@ -100,8 +109,7 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 		mainAccountID, ok := bankAccountsID[transactionParsed.BankAccountID]
 
 		if !ok {
-			spew.Dump(transactionParsed)
-			return oops.
+			return 0, oops.
 				In("importer").
 				WithContext(ctx).
 				With("external_id", transactionParsed.BankAccountID).
@@ -111,7 +119,7 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 		amountInverse, errAmountInverse := transactionParsed.Amount.Mul("-1")
 
 		if errAmountInverse != nil {
-			return oops.
+			return 0, oops.
 				In("importer").
 				With("amount", transactionParsed.Amount).
 				WithContext(ctx).
@@ -129,22 +137,28 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) error {
 					Amount:    transactionParsed.Amount,
 				},
 				{
-					AccountID: defaultExpenseTransaction.ID,
+					AccountID: defaultExpenseAccountID,
 					Amount:    amountInverse,
 				},
 			},
 		})
 	}
 
-	// where is bulk ?
+	if len(transactions) == 0 {
+		return 0, ofx.ErrNoTransactions
+	}
+
 	errSave := i.TransactionStore.Save(ctx, transactions)
 
 	if errSave != nil {
-		return oops.
+		if errors.Is(errSave, domain.ErrDuplicateTransaction) {
+			return 0, ErrDuplicateImport
+		}
+		return 0, oops.
 			In("importer").
 			WithContext(ctx).
 			Wrapf(errSave, "failed to save transactions")
 	}
 
-	return nil
+	return len(transactions), nil
 }

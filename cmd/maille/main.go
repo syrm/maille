@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CloudyKit/jet/v6"
@@ -183,13 +184,10 @@ func run(
 	}
 
 	upload := web.Upload{
-		Renderer:         renderer,
-		AccountStore:     accountStore,
-		TransactionStore: txStore,
-		Importer:         importer,
-		Classifier:       classifier,
-		Tracer:           tracerProvider.GetTracer("maille-web"),
-		Logger:           logger,
+		Renderer:   renderer,
+		Importer:   importer,
+		Classifier: classifier,
+		Logger:     logger,
 	}
 
 	dashboard := web.Dashboard{
@@ -212,9 +210,14 @@ func run(
 	staticFS := http.FileServer(http.Dir("./internal/web/dist"))
 	r.Handle("/assets/*", http.StripPrefix("/assets/", staticFS))
 
-	logger.InfoContext(ctx, "launch web server", slog.Any("port", 13000))
+	port := strings.TrimSpace(getenv("PORT"))
+	if port == "" {
+		port = "13000"
+	}
+	address := ":" + port
+	logger.InfoContext(ctx, "launch web server", slog.String("address", address))
 
-	if err := http.ListenAndServe(":13000", r); err != nil {
+	if err := http.ListenAndServe(address, r); err != nil {
 		logger.ErrorContext(ctx, "failed to start server", slog.Any("error", err))
 	}
 
@@ -266,21 +269,23 @@ func BuildTracerProvider(tracingEndpoint string) (Provider, *sdkresource.Resourc
 }
 
 func (p *Provider) getTracerProvider() (*sdktrace.TracerProvider, error) {
-	ctx := context.Background()
-
-	traceExporter, err := otlptracegrpc.New(
-		ctx,
-		otlptracegrpc.WithEndpoint(p.tracingEndpoint), // @TODO env variable
-		otlptracegrpc.WithInsecure(),
-	)
-	if err != nil {
-		return nil, oops.Wrapf(err, "error during creation of traceExporter")
+	options := []sdktrace.TracerProviderOption{
+		sdktrace.WithResource(p.otelResource),
 	}
 
-	tracer := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExporter),
-		sdktrace.WithResource(p.otelResource),
-	)
+	if p.tracingEndpoint != "" {
+		traceExporter, err := otlptracegrpc.New(
+			context.Background(),
+			otlptracegrpc.WithEndpoint(p.tracingEndpoint),
+			otlptracegrpc.WithInsecure(),
+		)
+		if err != nil {
+			return nil, oops.Wrapf(err, "error during creation of traceExporter")
+		}
+		options = append(options, sdktrace.WithBatcher(traceExporter))
+	}
+
+	tracer := sdktrace.NewTracerProvider(options...)
 
 	// meter := sdkmetric.NewMeterProvider(
 	// 	sdkmetric.WithReader(p.metricExporter),

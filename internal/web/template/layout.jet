@@ -1,13 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1" name="viewport">
-  <title>maille</title>
+  <title>Maille — Tableau de bord</title>
   <link href="/assets/style.css" rel="stylesheet">
   <script src="/assets/script.min.js" type="module"></script>
 </head>
 <body>
+  <button class="mob-btn" aria-label="Ouvrir le menu" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+    <svg fill="none" height="18" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="18"><line x1="3" x2="21" y1="6" y2="6"></line><line x1="3" x2="21" y1="12" y2="12"></line><line x1="3" x2="21" y1="18" y2="18"></line></svg>
+  </button>
+  <aside class="sidebar">
+    <a class="logo" href="/">
+      <span class="logo-icon">M</span>
+      <span class="logo-text">Maille</span>
+    </a>
+    <nav aria-label="Navigation principale">
+      <div class="nav-label">Principal</div>
+      <a class="nav-item {{ if currentPage == "dashboard" }}active{{ end }}" href="/">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect height="7" rx="1" width="7" x="3" y="3"></rect><rect height="7" rx="1" width="7" x="14" y="3"></rect><rect height="7" rx="1" width="7" x="3" y="14"></rect><rect height="7" rx="1" width="7" x="14" y="14"></rect></svg>
+        Tableau de bord
+      </a>
+      <a class="nav-item {{ if currentPage == "upload" }}active{{ end }}" href="/upload">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v12"></path><polyline points="7 8 12 3 17 8"></polyline><path d="M5 21h14a2 2 0 0 0 2-2v-4"></path><path d="M3 15v4a2 2 0 0 0 2 2"></path></svg>
+        Importer un relevé
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="local-status"><span></span> Données locales</div>
+    </div>
+  </aside>
   <main class="main">
     {{ yield body() }}
   </main>

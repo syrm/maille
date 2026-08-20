@@ -1,0 +1,20 @@
+services:
+  postgres:
+    command: >-
+      exec "$HOME/.local/bin/mise" exec --
+      postgres -D .amp/postgres -h 127.0.0.1 -p "$PORT"
+    port: 15432
+
+  web:
+    command: >-
+      "$HOME/.local/bin/mise" exec --
+      pg_isready -h 127.0.0.1 -p 15432 -U maille -d maille_orb -t 30 &&
+      exec "$HOME/.local/bin/mise" run serve
+    port: 13000
+    health: /
+    env:
+      DATABASE_URL: "postgres://maille@127.0.0.1:15432/maille_orb?sslmode=disable"
+      TRACING_ENDPOINT: ""
+    portal:
+      title: Maille
+      description: Tableau de bord de finances personnelles
