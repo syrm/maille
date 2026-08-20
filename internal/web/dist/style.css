@@ -391,13 +391,10 @@ body {
 .transaction-filters label { display: flex; flex-direction: column; gap: 6px; }
 .transaction-filters label > span { color: var(--text-3); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; }
 .transaction-filters input,
-.transaction-filters select,
-.category-form select { min-width: 0; height: 38px; border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; background: var(--bg); color: var(--text-2); font: inherit; font-size: 12px; outline: none; }
+.transaction-filters select { min-width: 0; height: 38px; border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; background: var(--bg); color: var(--text-2); font: inherit; font-size: 12px; outline: none; }
 .transaction-filters input:focus,
-.transaction-filters select:focus,
-.category-form select:focus { border-color: rgba(91, 219, 158, .45); }
-.filter-submit,
-.category-form button { height: 38px; border: 0; border-radius: 7px; padding: 0 13px; background: var(--green-bg); color: var(--green); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.transaction-filters select:focus { border-color: rgba(91, 219, 158, .45); }
+.filter-submit { height: 38px; border: 0; border-radius: 7px; padding: 0 13px; background: var(--green-bg); color: var(--green); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 .filter-reset { height: 38px; display: flex; align-items: center; color: var(--text-3); font-size: 11px; text-decoration: none; }
 .transaction-table { padding: 0; overflow: hidden; }
 .transaction-table-header,
@@ -412,9 +409,7 @@ body {
 .transaction-payee-copy strong { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .transaction-payee-copy small { width: max-content; padding: 1px 5px; border-radius: 4px; background: var(--amber-bg); color: var(--amber); font-size: 9px; font-weight: 600; }
 .transaction-category-icon { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 7px; font-size: 13px; }
-.category-form { min-width: 0; display: grid; grid-template-columns: minmax(125px, 1fr) auto; gap: 7px; }
-.category-form select { width: 100%; height: 34px; }
-.category-form button { height: 34px; padding: 0 10px; }
+.transaction-category { width: max-content; max-width: 100%; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,.035); color: var(--text-2); font-size: 11px; }
 .transaction-amount { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 .transaction-amount.inc { color: var(--green); }
 .transaction-amount.exp { color: var(--red); }
@@ -424,6 +419,46 @@ body {
 .transaction-pagination a,
 .transaction-pagination nav span { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-2); text-decoration: none; }
 .transaction-pagination a:hover { border-color: var(--border-hover); color: var(--text); }
+
+/* ─── CLASSIFICATION RULES ─── */
+.rule-run { border: 0; cursor: pointer; font: inherit; }
+.rules-layout { display: grid; grid-template-columns: minmax(300px, .8fr) minmax(420px, 1.2fr); gap: 14px; align-items: start; }
+.rule-editor form { display: flex; flex-direction: column; gap: 14px; }
+.rule-editor label { display: flex; flex-direction: column; gap: 7px; }
+.rule-editor label > span { color: var(--text-2); font-size: 11px; font-weight: 600; }
+.rule-editor textarea,
+.rule-editor select { width: 100%; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg); color: var(--text); font: inherit; font-size: 12px; outline: none; }
+.rule-editor textarea { min-height: 100px; resize: vertical; padding: 11px; font-family: 'JetBrains Mono', monospace; line-height: 1.55; }
+.rule-editor select { height: 40px; padding: 0 10px; }
+.rule-editor textarea:focus,
+.rule-editor select:focus { border-color: rgba(91, 219, 158, .45); }
+.rule-reference { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
+.rule-reference > strong { display: block; margin-bottom: 10px; font-size: 11px; }
+.rule-reference > code { display: inline-block; margin: 0 4px 5px 0; padding: 3px 6px; border-radius: 5px; background: var(--green-bg); color: var(--green); font-size: 10px; }
+.rule-reference p { margin: 9px 0 6px; color: var(--text-3); font-size: 10px; }
+.rule-reference pre { overflow-x: auto; padding: 10px; border-radius: 7px; background: var(--bg); color: var(--text-2); font: 10px/1.7 'JetBrains Mono', monospace; }
+.rule-list { list-style: none; }
+.rule-item { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.rule-item:last-child { border-bottom: 0; }
+.rule-priority { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.035); color: var(--text-3); font: 9px 'JetBrains Mono', monospace; }
+.rule-content { min-width: 0; }
+.rule-copy { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rule-copy > code { overflow: hidden; color: var(--text); font: 11px 'JetBrains Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+.rule-copy > span { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 10px; }
+.rule-copy i { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; font-style: normal; }
+.rule-actions { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.rule-edit { min-width: 0; flex: 1; }
+.rule-edit summary { width: max-content; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-2); font-size: 10px; cursor: pointer; list-style: none; }
+.rule-edit summary::-webkit-details-marker { display: none; }
+.rule-edit form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(145px, .45fr); gap: 10px; margin-top: 10px; padding: 12px; border-radius: 8px; background: var(--bg); }
+.rule-edit label { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: var(--text-3); font-size: 9px; text-transform: uppercase; letter-spacing: .5px; }
+.rule-edit textarea,
+.rule-edit select { width: 100%; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: 11px 'JetBrains Mono', monospace; outline: none; }
+.rule-edit textarea { min-height: 70px; padding: 8px; resize: vertical; }
+.rule-edit select { height: 36px; padding: 0 8px; font-family: inherit; }
+.rule-edit .rule-save { grid-column: 1 / -1; justify-self: start; border: 0; border-radius: 6px; padding: 7px 9px; background: var(--green-bg); color: var(--green); font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.rule-delete { border: 1px solid rgba(240,112,112,.2); border-radius: 6px; padding: 6px 8px; background: var(--red-bg); color: var(--red); font: inherit; font-size: 10px; cursor: pointer; }
+.rule-empty { min-height: 260px; }
 
 /* ─── ANIMATIONS ─── */
 @keyframes fadeIn {
@@ -446,8 +481,10 @@ body {
     .transaction-search { grid-column: 1 / -1; }
     .transaction-table-header { display: none; }
     .transaction-line { grid-template-columns: 75px minmax(180px, 1fr) 120px; gap: 10px; }
-    .category-form { grid-column: 2 / 4; grid-row: 2; }
+    .transaction-category { grid-column: 2; grid-row: 2; }
+    .transaction-amount { grid-column: 3; grid-row: 1; }
     .transaction-account { display: none; }
+    .rules-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -463,9 +500,9 @@ body {
     .transaction-filters { grid-template-columns: 1fr; }
     .transaction-search { grid-column: auto; }
     .transaction-line { grid-template-columns: 62px minmax(0, 1fr) auto; padding: 12px; }
-    .category-form { grid-column: 1 / -1; grid-row: auto; }
-    .category-form button { padding: 0 8px; }
     .transaction-pagination { align-items: flex-start; flex-direction: column; }
+    .rule-copy > code { overflow-wrap: anywhere; white-space: normal; }
+    .rule-edit form { grid-template-columns: 1fr; }
 }
 
 /* ─── SCROLLBAR ─── */

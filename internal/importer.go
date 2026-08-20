@@ -130,7 +130,7 @@ func (i Importer) Import(ctx context.Context, reader io.Reader) (int, error) {
 			ExternalID: transactionParsed.ID,
 			Date:       transactionParsed.Date,
 			Payee:      transactionParsed.Payee,
-			Narration:  new(string),
+			Narration:  &transactionParsed.Narration,
 			Postings: []domain.Posting{
 				{
 					AccountID: mainAccountID,

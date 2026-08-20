@@ -1,0 +1,106 @@
+{{ extends "layout.jet" }}
+
+{{ block body() }}
+{{ if notice }}<div class="feedback success anim d1" role="status">{{ notice }}</div>{{ end }}
+{{ if errorMessage }}<div class="feedback error anim d1" role="alert">{{ errorMessage }}</div>{{ end }}
+
+<div class="header anim d1">
+  <div>
+    <h1>Règles de classification</h1>
+    <p>La première expression correspondante choisit la catégorie.</p>
+  </div>
+  <form method="post" action="/rules/run">
+    <button class="header-link rule-run" type="submit">Exécuter le moteur</button>
+  </form>
+</div>
+
+<div class="rules-layout">
+  <section class="card rule-editor anim d2">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Nouvelle règle</div>
+        <div class="card-sub">L’expression est validée par le moteur Go avant enregistrement.</div>
+      </div>
+    </div>
+    <form method="post" action="/rules">
+      <label>
+        <span>Expression</span>
+        <textarea name="rule" maxlength="500" required placeholder='payee contains "AMAZON"'></textarea>
+      </label>
+      <label>
+        <span>Catégorie cible</span>
+        <select name="account_id" required>
+          <option value="">Choisir une catégorie</option>
+          {{ range _, category := categories }}
+          <option value="{{ category.ID }}">{{ category.Icon }} {{ category.Label }}</option>
+          {{ end }}
+        </select>
+      </label>
+      <button class="primary-button" type="submit">Créer et appliquer la règle</button>
+    </form>
+
+    <div class="rule-reference">
+      <strong>Contexte disponible</strong>
+      <code>payee</code><code>narration</code><code>date</code><code>day_of_week</code>
+      <code>month</code><code>year</code><code>amount</code><code>currency</code><code>account</code>
+      <p>Exemples :</p>
+      <pre>payee contains "AMAZON"
+month == 12 and amount.IsNegative()
+currency == "EUR" and account == "Other"</pre>
+    </div>
+  </section>
+
+  <section class="card rule-list-card anim d3">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Règles actives</div>
+        <div class="card-sub">Ordre de priorité : de haut en bas.</div>
+      </div>
+    </div>
+    {{ if hasRules }}
+    <ol class="rule-list">
+      {{ range _, rule := rules }}
+      <li class="rule-item">
+        <span class="rule-priority">{{ rule.Priority }}</span>
+        <div class="rule-content">
+          <div class="rule-copy">
+            <code>{{ rule.Rule }}</code>
+            <span><i style="background:{{ rule.Account.Color }}">{{ rule.Account.Icon }}</i> {{ rule.Account.Alias }}</span>
+          </div>
+          <div class="rule-actions">
+            <details class="rule-edit">
+              <summary>Modifier</summary>
+              <form method="post" action="/rules/{{ rule.ID }}">
+                <label>
+                  <span>Expression</span>
+                  <textarea name="rule" maxlength="500" required>{{ rule.Rule }}</textarea>
+                </label>
+                <label>
+                  <span>Catégorie cible</span>
+                  <select name="account_id" required>
+                    {{ range _, category := categories }}
+                    <option value="{{ category.ID }}" {{ if category.ID == rule.Account.ID }}selected{{ end }}>{{ category.Icon }} {{ category.Label }}</option>
+                    {{ end }}
+                  </select>
+                </label>
+                <button class="rule-save" type="submit">Enregistrer et recalculer</button>
+              </form>
+            </details>
+            <form method="post" action="/rules/{{ rule.ID }}/delete">
+              <button class="rule-delete" type="submit" aria-label="Supprimer la règle {{ rule.Rule }}">Supprimer</button>
+            </form>
+          </div>
+        </div>
+      </li>
+      {{ end }}
+    </ol>
+    {{ else }}
+    <div class="empty-state rule-empty">
+      <span class="empty-icon">ƒ</span>
+      <strong>Aucune règle</strong>
+      <span>Créez une expression pour automatiser la classification.</span>
+    </div>
+    {{ end }}
+  </section>
+</div>
+{{ end }}

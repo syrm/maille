@@ -26,6 +26,10 @@
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path></svg>
         Transactions
       </a>
+      <a class="nav-item {{ if currentPage == "rules" }}active{{ end }}" href="/rules">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h10"></path><path d="M4 12h16"></path><path d="M4 18h7"></path><circle cx="17" cy="6" r="2"></circle><circle cx="14" cy="18" r="2"></circle></svg>
+        Règles
+      </a>
       <a class="nav-item {{ if currentPage == "upload" }}active{{ end }}" href="/upload">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v12"></path><polyline points="7 8 12 3 17 8"></polyline><path d="M5 21h14a2 2 0 0 0 2-2v-4"></path><path d="M3 15v4a2 2 0 0 0 2 2"></path></svg>
         Importer un relevé

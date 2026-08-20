@@ -133,14 +133,16 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 		`SELECT transaction.id,
        date,
        payee,
+	   COALESCE(narration, '') AS narration,
        (ARRAY_AGG(account.name ORDER BY posting.id))[2] as account,
        (ARRAY_AGG(posting.id ORDER BY posting.id))[2] as posting_id,
        (ARRAY_AGG(account.id ORDER BY posting.id))[2] as account_id,
-       (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount
+	   (ARRAY_AGG(amount ORDER BY posting.id))[1] as amount,
+	   ((ARRAY_AGG(amount ORDER BY posting.id))[1]).currency_code as currency
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
 		INNER JOIN account ON (account.id = posting.account_id)
-		WHERE transaction.id > @after AND transaction.classified_at IS NULL
+		WHERE transaction.id > @after
 		GROUP BY transaction.id
 		ORDER BY transaction.id
 		LIMIT @size`,
@@ -170,10 +172,12 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 			ID:        toClassify.ID,
 			Date:      toClassify.Date,
 			Payee:     toClassify.Payee,
+			Narration: toClassify.Narration,
 			PostingID: toClassify.PostingID,
 			AccountID: toClassify.AccountID,
 			Account:   toClassify.Account,
 			Amount:    toClassify.Amount,
+			Currency:  toClassify.Currency,
 		}
 	}
 
@@ -318,58 +322,6 @@ func (t *Transaction) List(ctx context.Context, filter domain.TransactionListFil
 	return transactions, total, nil
 }
 
-func (t *Transaction) UpdateCategory(ctx context.Context, transactionID uint64, accountID uint64) error {
-	ctx, span := t.tracer.Start(ctx, "Transaction.UpdateCategory")
-	defer span.End()
-
-	result, errExec := t.pool.Exec(
-		context.WithValue(ctx, SQLName, "update transaction category"),
-		`WITH updated_posting AS (
-		    UPDATE posting
-		    SET account_id = @accountID
-		    WHERE transaction_id = @transactionID
-		      AND id = (
-		          SELECT posting_to_update.id
-		          FROM posting AS posting_to_update
-		          INNER JOIN account AS current_account ON current_account.id = posting_to_update.account_id
-		          WHERE posting_to_update.transaction_id = @transactionID
-		            AND current_account.type <> 'Assets'
-		          ORDER BY posting_to_update.id
-		          LIMIT 1
-		      )
-		      AND EXISTS (
-		          SELECT 1 FROM account AS target_account
-		          WHERE target_account.id = @accountID
-		            AND target_account.type IN ('Expenses', 'Income')
-		      )
-		    RETURNING transaction_id
-		)
-		UPDATE transaction
-		SET classified_at = CURRENT_TIMESTAMP
-		WHERE id = (SELECT transaction_id FROM updated_posting)`,
-		pgx.NamedArgs{
-			"transactionID": transactionID,
-			"accountID":     accountID,
-		},
-	)
-	if errExec != nil {
-		return oops.
-			In("postgres.transaction").
-			WithContext(ctx).
-			Wrapf(errExec, "failed to update transaction category")
-	}
-	if result.RowsAffected() != 1 {
-		return oops.
-			In("postgres.transaction").
-			WithContext(ctx).
-			With("transaction_id", transactionID).
-			With("account_id", accountID).
-			Errorf("transaction or category not found")
-	}
-
-	return nil
-}
-
 func (t *Transaction) Save(ctx context.Context, transactions []domain.Transaction) error {
 	ctx, span := t.tracer.Start(ctx, "Transaction.Save")
 	defer span.End()
@@ -385,10 +337,15 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 
 		// Add transaction to transaction builder
 		date := transaction.Date.Format(time.DateOnly)
-		trSb.WriteString(fmt.Sprintf("%d\t%s\tt\t%s\t%s\t%s\n",
+		narration := ""
+		if transaction.Narration != nil {
+			narration = *transaction.Narration
+		}
+		trSb.WriteString(fmt.Sprintf("%d\t%s\tt\t%s\t%s\t%s\t%s\n",
 			transactionID,
 			date,
 			copyText(transaction.Payee),
+			copyText(narration),
 			copyText(transaction.ExternalID),
 			copyText(transaction.ExternalID)))
 
@@ -422,7 +379,7 @@ func (t *Transaction) Save(ctx context.Context, transactions []domain.Transactio
 	_, errCopyTr := pgConn.CopyFrom(
 		context.WithValue(ctx, SQLName, "copy transaction"),
 		trReader,
-		"COPY transaction (id, date, completed, payee, external_id, import_key) FROM STDIN",
+		"COPY transaction (id, date, completed, payee, narration, external_id, import_key) FROM STDIN",
 	)
 	if errCopyTr != nil {
 		var pgErr *pgconn.PgError

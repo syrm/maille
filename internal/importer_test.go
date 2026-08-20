@@ -61,7 +61,7 @@ func TestImporterBuildsBalancedTransactionsWithAccountID(t *testing.T) {
 	importer := Importer{
 		Parser: parserStub{transactions: []ofx.TransactionParsed{{
 			ID: "fitid-1", Date: time.Date(2026, 8, 19, 0, 0, 0, 0, time.UTC), Payee: "AMAZON",
-			Amount: amount, BankAccountID: "bank-external-id",
+			Narration: "ACHAT CARTE", Amount: amount, BankAccountID: "bank-external-id",
 		}}},
 		TransactionStore: store,
 		AccountStore:     accountStoreStub{{ID: 7, Type: domain.AccountTypeExpenses, Name: "Other"}},
@@ -75,6 +75,9 @@ func TestImporterBuildsBalancedTransactionsWithAccountID(t *testing.T) {
 	}
 	if count != 1 || len(store.saved) != 1 {
 		t.Fatalf("Import() count = %d, saved = %d", count, len(store.saved))
+	}
+	if store.saved[0].Narration == nil || *store.saved[0].Narration != "ACHAT CARTE" {
+		t.Errorf("saved narration = %v", store.saved[0].Narration)
 	}
 	postings := store.saved[0].Postings
 	if postings[0].AccountID != 42 {
