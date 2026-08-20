@@ -44,6 +44,7 @@ func (u Upload) Router() *chi.Mux {
 func (u Upload) Get(w http.ResponseWriter, r *http.Request) {
 	variables := jet.VarMap{}
 	variables.Set("lang", r.Context().Value(middleware.LangKey))
+	variables.Set("pageTitle", "Importer un relevé")
 	variables.Set("currentPage", "upload")
 	variables.Set("errorMessage", uploadErrorMessage(r.URL.Query().Get("error")))
 

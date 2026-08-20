@@ -140,7 +140,7 @@ func (t *Transaction) GetAllToClassify(ctx context.Context, after uint64, size u
 		FROM transaction
 		INNER JOIN posting ON (posting.transaction_id = transaction.id)
 		INNER JOIN account ON (account.id = posting.account_id)
-		WHERE transaction.id > @after
+		WHERE transaction.id > @after AND transaction.classified_at IS NULL
 		GROUP BY transaction.id
 		ORDER BY transaction.id
 		LIMIT @size`,
@@ -234,6 +234,140 @@ func (t *Transaction) GetRecentTransactions(ctx context.Context, size uint) ([]d
 	}
 
 	return txs, nil
+}
+
+func (t *Transaction) List(ctx context.Context, filter domain.TransactionListFilter) ([]domain.TransactionListItem, uint64, error) {
+	ctx, span := t.tracer.Start(ctx, "Transaction.List")
+	defer span.End()
+
+	rows, errQuery := t.pool.Query(
+		context.WithValue(ctx, SQLName, "list transactions"),
+		`WITH transaction_rows AS (
+			SELECT transaction.id,
+			       transaction.date,
+			       transaction.payee,
+			       transaction.classified_at IS NOT NULL AS classified,
+			       (ARRAY_AGG(account.id ORDER BY posting.id))[2] AS category_id,
+			       (ARRAY_AGG(account.name ORDER BY posting.id))[2] AS category,
+			       (ARRAY_AGG(account.alias ORDER BY posting.id))[2] AS category_alias,
+			       (ARRAY_AGG(account.icon ORDER BY posting.id))[2] AS category_icon,
+			       (ARRAY_AGG(account.color ORDER BY posting.id))[2] AS category_color,
+			       (ARRAY_AGG(account.alias ORDER BY posting.id))[1] AS bank_account,
+			       (ARRAY_AGG(posting.amount ORDER BY posting.id))[1] AS amount
+			FROM transaction
+			INNER JOIN posting ON posting.transaction_id = transaction.id
+			INNER JOIN account ON account.id = posting.account_id
+			GROUP BY transaction.id
+		)
+		SELECT id, date, payee, classified, category_id, category, category_alias,
+		       category_icon, category_color, bank_account, amount, COUNT(*) OVER() AS total
+		FROM transaction_rows
+		WHERE (@search = '' OR payee ILIKE '%' || @search || '%')
+		  AND (@categoryID = 0 OR category_id = @categoryID)
+		  AND (NOT @uncategorized OR NOT classified)
+		ORDER BY date DESC, id DESC
+		LIMIT @limit OFFSET @offset`,
+		pgx.NamedArgs{
+			"search":        filter.Search,
+			"categoryID":    filter.CategoryID,
+			"uncategorized": filter.Uncategorized,
+			"limit":         filter.Limit,
+			"offset":        filter.Offset,
+		},
+	)
+	if errQuery != nil {
+		return nil, 0, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errQuery, "failed to list transactions")
+	}
+	defer rows.Close()
+
+	transactions := make([]domain.TransactionListItem, 0, filter.Limit)
+	var total uint64
+	for rows.Next() {
+		var transaction domain.TransactionListItem
+		if err := rows.Scan(
+			&transaction.ID,
+			&transaction.Date,
+			&transaction.Payee,
+			&transaction.Classified,
+			&transaction.CategoryID,
+			&transaction.Category,
+			&transaction.CategoryAlias,
+			&transaction.CategoryIcon,
+			&transaction.CategoryColor,
+			&transaction.BankAccount,
+			&transaction.Amount,
+			&total,
+		); err != nil {
+			return nil, 0, oops.
+				In("postgres.transaction").
+				WithContext(ctx).
+				Wrapf(err, "failed to scan transaction list")
+		}
+		transactions = append(transactions, transaction)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(err, "failed to iterate transaction list")
+	}
+
+	return transactions, total, nil
+}
+
+func (t *Transaction) UpdateCategory(ctx context.Context, transactionID uint64, accountID uint64) error {
+	ctx, span := t.tracer.Start(ctx, "Transaction.UpdateCategory")
+	defer span.End()
+
+	result, errExec := t.pool.Exec(
+		context.WithValue(ctx, SQLName, "update transaction category"),
+		`WITH updated_posting AS (
+		    UPDATE posting
+		    SET account_id = @accountID
+		    WHERE transaction_id = @transactionID
+		      AND id = (
+		          SELECT posting_to_update.id
+		          FROM posting AS posting_to_update
+		          INNER JOIN account AS current_account ON current_account.id = posting_to_update.account_id
+		          WHERE posting_to_update.transaction_id = @transactionID
+		            AND current_account.type <> 'Assets'
+		          ORDER BY posting_to_update.id
+		          LIMIT 1
+		      )
+		      AND EXISTS (
+		          SELECT 1 FROM account AS target_account
+		          WHERE target_account.id = @accountID
+		            AND target_account.type IN ('Expenses', 'Income')
+		      )
+		    RETURNING transaction_id
+		)
+		UPDATE transaction
+		SET classified_at = CURRENT_TIMESTAMP
+		WHERE id = (SELECT transaction_id FROM updated_posting)`,
+		pgx.NamedArgs{
+			"transactionID": transactionID,
+			"accountID":     accountID,
+		},
+	)
+	if errExec != nil {
+		return oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			Wrapf(errExec, "failed to update transaction category")
+	}
+	if result.RowsAffected() != 1 {
+		return oops.
+			In("postgres.transaction").
+			WithContext(ctx).
+			With("transaction_id", transactionID).
+			With("account_id", accountID).
+			Errorf("transaction or category not found")
+	}
+
+	return nil
 }
 
 func (t *Transaction) Save(ctx context.Context, transactions []domain.Transaction) error {

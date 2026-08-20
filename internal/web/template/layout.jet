@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1" name="viewport">
-  <title>Maille — Tableau de bord</title>
+  <title>Maille — {{ pageTitle }}</title>
   <link href="/assets/style.css" rel="stylesheet">
   <script src="/assets/script.min.js" type="module"></script>
 </head>
@@ -21,6 +21,10 @@
       <a class="nav-item {{ if currentPage == "dashboard" }}active{{ end }}" href="/">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect height="7" rx="1" width="7" x="3" y="3"></rect><rect height="7" rx="1" width="7" x="14" y="3"></rect><rect height="7" rx="1" width="7" x="3" y="14"></rect><rect height="7" rx="1" width="7" x="14" y="14"></rect></svg>
         Tableau de bord
+      </a>
+      <a class="nav-item {{ if currentPage == "transactions" }}active{{ end }}" href="/transactions">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path></svg>
+        Transactions
       </a>
       <a class="nav-item {{ if currentPage == "upload" }}active{{ end }}" href="/upload">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v12"></path><polyline points="7 8 12 3 17 8"></polyline><path d="M5 21h14a2 2 0 0 0 2-2v-4"></path><path d="M3 15v4a2 2 0 0 0 2 2"></path></svg>

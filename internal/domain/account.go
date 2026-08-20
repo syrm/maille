@@ -1,7 +1,10 @@
 package domain
 
 type Account struct {
-	ID   uint64
-	Type AccountType
-	Name string
+	ID    uint64
+	Type  AccountType
+	Name  string
+	Alias string
+	Icon  string
+	Color string
 }

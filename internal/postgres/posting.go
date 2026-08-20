@@ -27,7 +27,15 @@ func (s *Posting) UpdateAccount(ctx context.Context, postingID uint64, accountID
 
 	_, errExec := s.pool.Exec(
 		context.WithValue(ctx, SQLName, "update account"),
-		`UPDATE posting SET account_id = @accountID WHERE id = @id`,
+		`WITH updated_posting AS (
+		    UPDATE posting
+		    SET account_id = @accountID
+		    WHERE id = @id
+		    RETURNING transaction_id
+		)
+		UPDATE transaction
+		SET classified_at = CURRENT_TIMESTAMP
+		WHERE id = (SELECT transaction_id FROM updated_posting)`,
 		pgx.NamedArgs{
 			"accountID": accountID,
 			"id":        postingID,

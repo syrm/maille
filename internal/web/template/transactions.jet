@@ -1,0 +1,103 @@
+{{ extends "layout.jet" }}
+
+{{ block body() }}
+{{ if notice }}
+<div class="feedback success anim d1" role="status">{{ notice }}</div>
+{{ end }}
+{{ if errorMessage }}
+<div class="feedback error anim d1" role="alert">{{ errorMessage }}</div>
+{{ end }}
+
+<div class="header anim d1">
+  <div>
+    <h1>Transactions</h1>
+    <p>Consultez et corrigez vos opérations importées.</p>
+  </div>
+  <a class="header-link" href="/upload">Importer un relevé</a>
+</div>
+
+<form class="transaction-filters card anim d2" method="get">
+  <label class="transaction-search">
+    <span>Recherche</span>
+    <input name="q" placeholder="Libellé de la transaction…" type="search" value="{{ filter.Search }}">
+  </label>
+  <label>
+    <span>Catégorie</span>
+    <select name="category">
+      <option value="">Toutes les catégories</option>
+      {{ range _, category := categories }}
+      <option value="{{ category.ID }}" {{ if filter.CategoryID == category.ID }}selected{{ end }}>{{ category.Icon }} {{ category.Label }}</option>
+      {{ end }}
+    </select>
+  </label>
+  <label>
+    <span>État</span>
+    <select name="review">
+      <option value="">Toutes les opérations</option>
+      <option value="uncategorized" {{ if filter.Uncategorized }}selected{{ end }}>À catégoriser</option>
+    </select>
+  </label>
+  <button class="filter-submit" type="submit">Filtrer</button>
+  {{ if filter.Search || filter.CategoryID || filter.Uncategorized }}
+  <a class="filter-reset" href="/transactions">Réinitialiser</a>
+  {{ end }}
+</form>
+
+<section class="card transaction-table anim d3" aria-label="Liste des transactions">
+  <div class="transaction-table-header" aria-hidden="true">
+    <span>Date</span>
+    <span>Libellé</span>
+    <span>Catégorie</span>
+    <span>Compte</span>
+    <span>Montant</span>
+  </div>
+
+  {{ if hasTransactions }}
+  <div class="transaction-table-body">
+    {{ range _, transaction := transactions }}
+    <article class="transaction-line">
+      <time datetime="{{ transaction.Date.Format("2006-01-02") }}">{{ shortDate(transaction.Date, lang) }}</time>
+      <div class="transaction-payee">
+        <span class="transaction-category-icon" style="background:{{ transaction.CategoryColor }}">{{ transaction.CategoryIcon }}</span>
+        <span class="transaction-payee-copy">
+          <strong>{{ transaction.Payee }}</strong>
+          {{ if !transaction.Classified }}<small>À catégoriser</small>{{ end }}
+        </span>
+      </div>
+      <form class="category-form" method="post" action="/transactions/{{ transaction.ID }}/category">
+        <input name="q" type="hidden" value="{{ filter.Search }}">
+        <input name="category" type="hidden" value="{{ filter.CategoryID }}">
+        <input name="review" type="hidden" value="{{ if filter.Uncategorized }}uncategorized{{ end }}">
+        <input name="page" type="hidden" value="{{ page }}">
+        <select aria-label="Catégorie de {{ transaction.Payee }}" name="account_id">
+          {{ range _, category := categories }}
+          <option value="{{ category.ID }}" {{ if transaction.CategoryID == category.ID }}selected{{ end }}>{{ category.Icon }} {{ category.Label }}</option>
+          {{ end }}
+        </select>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <span class="transaction-account">{{ transaction.BankAccount }}</span>
+      <strong class="transaction-amount {{ if transaction.Amount.IsPositive() }}inc{{ else }}exp{{ end }}">{{ formatMoney(transaction.Amount, lang, 2) }}</strong>
+    </article>
+    {{ end }}
+  </div>
+  {{ else }}
+  <div class="empty-state transaction-list-empty">
+    <span class="empty-icon">⌕</span>
+    <strong>Aucune transaction trouvée</strong>
+    <span>Modifiez vos filtres ou importez un nouveau relevé.</span>
+  </div>
+  {{ end }}
+
+  <footer class="transaction-pagination">
+    <span>
+      {{ if pagination.Total }}{{ pagination.Start }}–{{ pagination.End }} sur {{ pagination.Total }}{{ else }}0 transaction{{ end }}
+    </span>
+    <nav aria-label="Pagination des transactions">
+      {{ if pagination.HasPrevious }}<a href="{{ pagination.PreviousURL }}">Précédent</a>{{ end }}
+      <span>Page {{ pagination.CurrentPage }}</span>
+      {{ if pagination.HasNext }}<a href="{{ pagination.NextURL }}">Suivant</a>{{ end }}
+    </nav>
+  </footer>
+</section>
+{{ end }}
