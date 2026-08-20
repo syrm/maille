@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <title>maille</title>
+  <link href="/assets/style.css" rel="stylesheet">
+  <script src="/assets/script.min.js" type="module"></script>
+</head>
+<body>
+  <main class="main">
+    {{ yield body() }}
+  </main>
+</body>
+</html>

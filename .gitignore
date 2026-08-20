@@ -1,2 +1,10 @@
 tmp
+demo-2023-2027.ofx
 demo.ofx
+frontend/lib
+frontend/node_modules
+old.frontend
+.test
+*.res.mjs
+*.min.js
+node_modules

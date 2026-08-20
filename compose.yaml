@@ -1,0 +1,15 @@
+services:
+  perses:
+    image: persesdev/perses:latest
+    container_name: perses
+    ports:
+      - "127.0.0.1:8689:8080"
+    volumes:
+      - ./perses-config.yaml:/etc/perses/config.yaml
+      - ./perses-data:/perses
+    networks:
+      - docker-monitoring_public
+
+networks:
+  docker-monitoring_public:
+    external: true

@@ -1,0 +1,61 @@
+?   	github.com/syrm/maille/cmd	[no test files]
+?   	github.com/syrm/maille/internal	[no test files]
+?   	github.com/syrm/maille/internal/domain	[no test files]
+goos: linux
+goarch: amd64
+pkg: github.com/syrm/maille/internal/ofx
+cpu: AMD Ryzen 9 3900X 12-Core Processor            
+BenchmarkSplitOnStmtTrn/match_simple-24         	87645894	        11.58 ns/op	2935.15 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	92057655	        11.68 ns/op	2909.77 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	100000000	        11.80 ns/op	2881.13 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	100000000	        11.80 ns/op	2881.52 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	100000000	        11.84 ns/op	2872.64 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	93161358	        11.25 ns/op	3022.89 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	100000000	        11.64 ns/op	2921.67 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	98112807	        11.53 ns/op	2948.74 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	98449195	        11.49 ns/op	2958.13 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/match_simple-24         	100000000	        11.72 ns/op	2900.24 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	100000000	        11.43 ns/op	2975.80 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	100000000	        11.52 ns/op	2951.24 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	100000000	        11.69 ns/op	2908.85 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	100000000	        11.97 ns/op	2839.36 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	93533950	        11.83 ns/op	2874.47 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	99104360	        12.40 ns/op	2742.31 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	100000000	        11.98 ns/op	2839.12 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	94093249	        12.22 ns/op	2781.79 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	95852823	        12.08 ns/op	2814.95 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/no_open_tag-24          	95866231	        11.62 ns/op	2926.05 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	94110375	        11.53 ns/op	2774.26 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	100000000	        11.68 ns/op	2740.67 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	90462930	        12.54 ns/op	2551.78 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	100000000	        11.66 ns/op	2744.69 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	91656297	        11.70 ns/op	2734.95 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	100000000	        11.48 ns/op	2788.09 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	89887484	        11.62 ns/op	2753.58 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	88082205	        11.64 ns/op	2748.30 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	96855262	        11.79 ns/op	2713.52 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/open_no_close-24        	99752299	        12.08 ns/op	2649.41 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	282310077	         4.257 ns/op	1644.17 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	254876707	         4.407 ns/op	1588.44 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	272651889	         4.250 ns/op	1647.10 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	269876762	         4.341 ns/op	1612.57 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	270878553	         4.335 ns/op	1614.61 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	281707592	         4.304 ns/op	1626.25 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	291088824	         4.256 ns/op	1644.61 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	281336775	         4.267 ns/op	1640.65 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	276280134	         4.298 ns/op	1628.83 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/at_eof_no_match-24      	281096460	         4.214 ns/op	1661.21 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1366938	       881.9 ns/op	74118.99 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1405507	       847.2 ns/op	77157.17 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1398150	       852.8 ns/op	76644.82 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1406611	       861.1 ns/op	75907.21 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1349847	       884.4 ns/op	73910.02 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1380825	       876.2 ns/op	74603.36 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1316652	       911.2 ns/op	71738.81 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1247965	       953.6 ns/op	68543.49 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1346995	       894.3 ns/op	73089.36 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitOnStmtTrn/large_payload-24        	 1363927	       879.2 ns/op	74344.30 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/syrm/maille/internal/ofx	57.963s
+?   	github.com/syrm/maille/internal/postgres	[no test files]
+?   	github.com/syrm/maille/internal/web	[no test files]

@@ -1,0 +1,18 @@
+{
+  "name": "maille",
+  "version": "0.0.0",
+  "scripts": {
+    "build": "rescript build && esbuild src/main.mjs --bundle --format=esm --platform=browser --target=es2020 --outfile=../../internal/web/dist/script.min.js",
+    "res:build": "rescript",
+    "res:clean": "rescript clean",
+    "res:dev": "rescript watch"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@rescript/core": "^1.5",
+    "rescript": "^12.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

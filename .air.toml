@@ -2,12 +2,12 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "go build -o ./tmp/server ./cmd"
+  cmd = "go build -o ./tmp/server ./cmd/maille"
   bin = "./tmp/server"
   delay = 500
   exclude_dir = ["tmp", "vendor", ".jj"]
   exclude_regex = ["_test.go"]
-  include_ext = ["go", "toml", "yaml", "html", "tmpl"]
+  include_ext = ["go", "toml", "yaml", "html", "tmpl", "jet", "css", "js"]
   kill_delay = 500
 
 [log]

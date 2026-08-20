@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patrimoine — Transactions</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0b0d12;
+    --surface: #12151c;
+    --surface-2: #181c25;
+    --surface-3: #1e222e;
+    --border: #1c2030;
+    --border-hover: #2a2f42;
+    --text: #e8eaf0;
+    --text-2: #9399ad;
+    --text-3: #565c72;
+    --green: #5bdb9e;
+    --green-bg: rgba(91,219,158,0.1);
+    --red: #f07070;
+    --red-bg: rgba(240,112,112,0.1);
+    --blue: #5b9ef0;
+    --blue-bg: rgba(91,158,240,0.1);
+    --amber: #eab244;
+    --amber-bg: rgba(234,178,68,0.1);
+    --purple: #9b7ef0;
+    --purple-bg: rgba(155,126,240,0.1);
+    --cyan: #3ecde0;
+    --cyan-bg: rgba(62,205,224,0.1);
+    --pink: #e870b5;
+    --pink-bg: rgba(232,112,181,0.1);
+    --r: 12px;
+    --r-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: 240px;
+    min-height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    transition: transform .3s;
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; padding: 0 8px; }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--green), #2ec4a0);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 15px; font-weight: 700;
+    box-shadow: 0 2px 16px rgba(91,219,158,0.25);
+  }
+  .logo-text { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; }
+
+  .nav-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--text-3); margin: 20px 0 8px; padding-left: 10px; font-weight: 600;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: var(--r-sm);
+    color: var(--text-2); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all .15s; margin-bottom: 1px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.03); color: var(--text); }
+  .nav-item.active { background: var(--green-bg); color: var(--green); }
+  .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+  .user-card { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-email { font-size: 11px; color: var(--text-3); }
+
+  /* ─── MAIN ─── */
+  .main { flex: 1; margin-left: 240px; padding: 24px 28px 40px; }
+
+  /* ─── HEADER ─── */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+  .header p { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  .btn-primary {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 14px; font-size: 12px; font-weight: 600;
+    font-family: inherit; color: var(--bg); background: var(--green);
+    border: none; border-radius: var(--r-sm); cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-primary:hover { background: #4fc98e; transform: translateY(-1px); }
+
+  .btn-icon {
+    width: 34px; height: 34px; border-radius: var(--r-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-3); display: grid; place-items: center;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-icon:hover { border-color: var(--border-hover); color: var(--text-2); }
+
+  /* ─── CARD ─── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 20px;
+  }
+
+  /* ─── KPI ROW ─── */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px; margin-bottom: 20px;
+  }
+  .kpi-card { padding: 18px 20px; position: relative; overflow: hidden; }
+  .kpi-label { font-size: 11px; color: var(--text-2); font-weight: 500; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .kpi-label .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .kpi-value {
+    font-family: 'JetBrains Mono', monospace; font-size: 22px;
+    font-weight: 600; letter-spacing: -0.5px; margin-bottom: 6px;
+  }
+  .kpi-value.pos { color: var(--green); }
+  .kpi-value.neg { color: var(--red); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+  }
+  .badge.up { color: var(--green); background: var(--green-bg); }
+  .badge.down { color: var(--red); background: var(--red-bg); }
+  .badge.neutral { color: var(--text-2); background: var(--surface-3); }
+
+  /* ─── FILTERS BAR ─── */
+  .filters {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 14px 16px;
+    display: flex; gap: 12px; align-items: center;
+    margin-bottom: 16px; flex-wrap: wrap;
+  }
+
+  .search-box {
+    flex: 1; min-width: 240px; position: relative;
+    display: flex; align-items: center;
+  }
+  .search-box svg {
+    position: absolute; left: 12px; width: 15px; height: 15px;
+    color: var(--text-3); pointer-events: none;
+  }
+  .search-box input {
+    width: 100%; padding: 9px 12px 9px 34px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--r-sm); color: var(--text);
+    font-size: 13px; font-family: inherit;
+    transition: border-color .15s;
+  }
+  .search-box input:focus { outline: none; border-color: var(--border-hover); }
+  .search-box input::placeholder { color: var(--text-3); }
+
+  .filter-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text-2); font-size: 12px; font-weight: 500;
+    font-family: inherit; cursor: pointer; transition: all .15s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .filter-btn.active { background: var(--green-bg); border-color: rgba(91,219,158,.25); color: var(--green); }
+  .filter-btn svg { width: 13px; height: 13px; }
+
+  .filter-sep { width: 1px; height: 22px; background: var(--border); }
+
+  /* ─── MAIN LAYOUT ─── */
+  .layout {
+    display: grid; grid-template-columns: 1fr 280px;
+    gap: 16px;
+  }
+
+  /* ─── TX TABLE ─── */
+  .tx-table { padding: 0; overflow: hidden; }
+
+  .tx-table-header {
+    display: grid;
+    grid-template-columns: 60px 1.6fr 1fr 120px 130px 32px;
+    gap: 12px; padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-3); font-weight: 600;
+  }
+
+  .tx-group-label {
+    padding: 14px 20px 8px;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-3); text-transform: uppercase;
+    letter-spacing: 1.2px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .tx-group-label .group-total {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-2);
+  }
+
+  .tx-row {
+    display: grid;
+    grid-template-columns: 60px 1.6fr 1fr 120px 130px 32px;
+    gap: 12px; padding: 13px 20px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .tx-row:hover { background: var(--surface-2); }
+  .tx-row:last-child { border-bottom: none; }
+
+  .tx-date-col {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-3);
+  }
+  .tx-date-col .day { font-size: 14px; font-weight: 600; color: var(--text); display: block; }
+
+  .tx-main-col { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .tx-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: grid; place-items: center; font-size: 14px; flex-shrink: 0;
+  }
+  .tx-text { min-width: 0; }
+  .tx-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tx-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+  .tx-cat-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 5px;
+    font-size: 11px; font-weight: 500;
+    white-space: nowrap;
+  }
+  .tx-cat-tag .cat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .tx-acct-col { font-size: 12px; color: var(--text-2); }
+  .tx-amt-col { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; text-align: right; }
+  .tx-amt-col.inc { color: var(--green); }
+  .tx-amt-col.exp { color: var(--text); }
+  .tx-menu-col {
+    color: var(--text-3);
+    display: grid; place-items: center;
+    width: 28px; height: 28px; border-radius: 6px;
+    transition: background .15s;
+  }
+  .tx-menu-col:hover { background: var(--border); color: var(--text-2); }
+
+  /* ─── PAGINATION ─── */
+  .pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-3);
+  }
+  .pagination-btns { display: flex; gap: 4px; }
+  .page-btn {
+    min-width: 28px; height: 28px; padding: 0 8px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text-2);
+    font-family: inherit; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  .page-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .page-btn.active { background: var(--green-bg); border-color: rgba(91,219,158,.25); color: var(--green); }
+
+  /* ─── SIDEBAR FILTERS ─── */
+  .side-panel { display: flex; flex-direction: column; gap: 14px; }
+
+  .panel-section { padding: 18px 20px; }
+  .panel-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-3); font-weight: 600; margin-bottom: 14px;
+  }
+
+  .cat-list { display: flex; flex-direction: column; gap: 4px; }
+  .cat-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: var(--r-sm);
+    cursor: pointer; transition: background .15s;
+  }
+  .cat-item:hover { background: var(--surface-2); }
+  .cat-dot-lg { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+  .cat-name { flex: 1; font-size: 12px; font-weight: 500; }
+  .cat-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-3);
+    background: var(--surface-2); padding: 1px 7px; border-radius: 10px;
+  }
+  .cat-item:hover .cat-count { background: var(--surface-3); }
+
+  .amt-range {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .range-inputs { display: flex; gap: 8px; }
+  .range-input {
+    flex: 1; padding: 8px 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--r-sm); color: var(--text);
+    font-size: 12px; font-family: 'JetBrains Mono', monospace;
+  }
+  .range-input:focus { outline: none; border-color: var(--border-hover); }
+
+  /* Mini histogram */
+  .histo { display: flex; align-items: flex-end; gap: 2px; height: 40px; margin: 10px 0 4px; }
+  .histo-bar {
+    flex: 1; background: var(--surface-3);
+    border-radius: 2px; min-height: 3px;
+    transition: background .15s;
+  }
+  .histo-bar.active { background: var(--green); }
+  .histo-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .type-switch {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 3px;
+  }
+  .type-switch button {
+    padding: 7px 0; font-size: 11px; font-weight: 500;
+    font-family: inherit; color: var(--text-3);
+    background: none; border: none; border-radius: 5px;
+    cursor: pointer; transition: all .15s;
+  }
+  .type-switch button:hover { color: var(--text-2); }
+  .type-switch button.active { background: var(--surface-3); color: var(--text); }
+
+  /* ─── MOBILE ─── */
+  .mob-btn {
+    display: none; position: fixed; top: 14px; left: 14px; z-index: 200;
+    width: 36px; height: 36px; border-radius: var(--r-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); align-items: center; justify-content: center; cursor: pointer;
+  }
+
+  @media (max-width: 1200px) {
+    .layout { grid-template-columns: 1fr; }
+    .side-panel { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  }
+  @media (max-width: 1024px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .side-panel { grid-template-columns: 1fr 1fr; }
+    .tx-table-header, .tx-row { grid-template-columns: 50px 1.4fr 100px 110px 28px; }
+    .tx-acct-col { display: none; }
+    .tx-table-header > div:nth-child(3) { display: none; }
+  }
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; padding: 16px; padding-top: 60px; }
+    .mob-btn { display: flex; }
+    .kpi-row { grid-template-columns: 1fr; }
+    .side-panel { grid-template-columns: 1fr; }
+    .tx-table-header, .tx-row { grid-template-columns: 1fr 100px; gap: 8px; }
+    .tx-date-col, .tx-acct-col, .tx-menu-col { display: none; }
+    .tx-table-header > div:nth-child(1), .tx-table-header > div:nth-child(3),
+    .tx-table-header > div:nth-child(6) { display: none; }
+  }
+
+  @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+  .anim { animation: fadeIn .4s ease forwards; opacity: 0; }
+  .d1{animation-delay:.03s} .d2{animation-delay:.06s} .d3{animation-delay:.09s}
+  .d4{animation-delay:.12s} .d5{animation-delay:.15s}
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<button class="mob-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">P</div>
+    <span class="logo-text">Patrimoine</span>
+  </div>
+  <nav>
+    <div class="nav-label">Principal</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Tableau de bord
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4h-4z"/></svg>
+      Comptes
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Transactions
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+      Budgets
+    </div>
+    <div class="nav-label">Investissements</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Portefeuille
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      Performances
+    </div>
+    <div class="nav-label">Outils</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Paramètres
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar">AL</div>
+      <div>
+        <div class="user-name">Alex Lemoine</div>
+        <div class="user-email">alex@email.com</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <!-- HEADER -->
+  <div class="header anim d1">
+    <div>
+      <h1>Transactions</h1>
+      <p>Historique complet · Février 2026</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" title="Importer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </button>
+      <button class="btn-icon" title="Exporter">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+      <button class="btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nouvelle transaction
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row anim d2">
+    <div class="card kpi-card">
+      <div class="kpi-label"><span class="dot" style="background:var(--text-2)"></span> Total transactions</div>
+      <div class="kpi-value">147</div>
+      <span class="badge neutral">Ce mois</span>
+    </div>
+    <div class="card kpi-card">
+      <div class="kpi-label"><span class="dot" style="background:var(--green)"></span> Revenus</div>
+      <div class="kpi-value pos">+3 120,00 €</div>
+      <span class="badge up">↑ +2,5 %</span>
+    </div>
+    <div class="card kpi-card">
+      <div class="kpi-label"><span class="dot" style="background:var(--red)"></span> Dépenses</div>
+      <div class="kpi-value neg">−1 682,41 €</div>
+      <span class="badge down">↓ −12,4 %</span>
+    </div>
+    <div class="card kpi-card">
+      <div class="kpi-label"><span class="dot" style="background:var(--blue)"></span> Solde net</div>
+      <div class="kpi-value">+1 437,59 €</div>
+      <span class="badge up">↑ +18,2 %</span>
+    </div>
+  </div>
+
+  <!-- FILTERS BAR -->
+  <div class="filters anim d3">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Rechercher une transaction, un libellé, un montant…">
+    </div>
+    <button class="filter-btn active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Février 2026
+    </button>
+    <button class="filter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/></svg>
+      Tous les comptes
+    </button>
+    <button class="filter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Toutes catégories
+    </button>
+    <div class="filter-sep"></div>
+    <button class="filter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Plus de filtres
+    </button>
+  </div>
+
+  <!-- MAIN LAYOUT -->
+  <div class="layout anim d4">
+    <!-- TX TABLE -->
+    <div class="card tx-table">
+      <div class="tx-table-header">
+        <div>Date</div>
+        <div>Libellé</div>
+        <div>Catégorie</div>
+        <div>Compte</div>
+        <div style="text-align:right">Montant</div>
+        <div></div>
+      </div>
+
+      <div id="txContainer"></div>
+
+      <div class="pagination">
+        <div>Affichage <strong style="color:var(--text)">1–12</strong> sur <strong style="color:var(--text)">147</strong> transactions</div>
+        <div class="pagination-btns">
+          <button class="page-btn">‹</button>
+          <button class="page-btn active">1</button>
+          <button class="page-btn">2</button>
+          <button class="page-btn">3</button>
+          <button class="page-btn">…</button>
+          <button class="page-btn">13</button>
+          <button class="page-btn">›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <div class="side-panel">
+      <div class="card panel-section">
+        <div class="panel-title">Type</div>
+        <div class="type-switch">
+          <button class="active">Tout</button>
+          <button>Revenus</button>
+          <button>Dépenses</button>
+        </div>
+      </div>
+
+      <div class="card panel-section">
+        <div class="panel-title">Montant</div>
+        <div class="amt-range">
+          <div class="histo" id="histo"></div>
+          <div class="histo-labels">
+            <span>0 €</span>
+            <span>3 000 €</span>
+          </div>
+          <div class="range-inputs">
+            <input type="text" class="range-input" placeholder="Min" value="0 €">
+            <input type="text" class="range-input" placeholder="Max" value="3 000 €">
+          </div>
+        </div>
+      </div>
+
+      <div class="card panel-section">
+        <div class="panel-title">Catégories</div>
+        <div class="cat-list" id="catList"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─── DONNÉES ───
+const categories = {
+  salaire: { nom:'Salaire', color:'var(--green)', bg:'var(--green-bg)' },
+  logement: { nom:'Logement', color:'var(--red)', bg:'var(--red-bg)' },
+  alim: { nom:'Alimentation', color:'var(--amber)', bg:'var(--amber-bg)' },
+  transport: { nom:'Transport', color:'var(--blue)', bg:'var(--blue-bg)' },
+  loisirs: { nom:'Loisirs', color:'var(--purple)', bg:'var(--purple-bg)' },
+  invest: { nom:'Investissement', color:'var(--cyan)', bg:'var(--cyan-bg)' },
+  sante: { nom:'Santé', color:'var(--pink)', bg:'var(--pink-bg)' },
+  divers: { nom:'Divers', color:'var(--text-2)', bg:'var(--surface-3)' },
+};
+
+const transactionsGroupes = [
+  {
+    label: "Aujourd'hui · 6 février",
+    total: '−67,42 €',
+    items: [
+      { jour:'06', mois:'fév', nom:'Carrefour Market', sub:'CB · 14:32', cat:'alim', compte:'BNP Courant', amt:'−67,42 €', type:'exp', icon:'🛒' },
+    ]
+  },
+  {
+    label: 'Hier · 5 février',
+    total: '+2 070,00 €',
+    items: [
+      { jour:'05', mois:'fév', nom:'Salaire IbanFirst', sub:'Virement SEPA', cat:'salaire', compte:'BNP Courant', amt:'+2 850,00 €', type:'inc', icon:'💰' },
+      { jour:'05', mois:'fév', nom:'Loyer — Rue de Massy', sub:'Prélèvement SEPA', cat:'logement', compte:'BNP Courant', amt:'−780,00 €', type:'exp', icon:'🏠' },
+    ]
+  },
+  {
+    label: '4 février',
+    total: '−123,90 €',
+    items: [
+      { jour:'04', mois:'fév', nom:'Franprix', sub:'CB · 19:12', cat:'alim', compte:'BNP Courant', amt:'−42,15 €', type:'exp', icon:'🛒' },
+      { jour:'04', mois:'fév', nom:'Pharmacie Centrale', sub:'CB · 11:45', cat:'sante', compte:'BNP Courant', amt:'−18,75 €', type:'exp', icon:'💊' },
+      { jour:'04', mois:'fév', nom:'Uber Eats', sub:'CB · 20:34', cat:'alim', compte:'BNP Courant', amt:'−23,90 €', type:'exp', icon:'🍱' },
+      { jour:'04', mois:'fév', nom:'Decathlon Massy', sub:'CB · 15:22', cat:'loisirs', compte:'BNP Courant', amt:'−39,10 €', type:'exp', icon:'🏃' },
+    ]
+  },
+  {
+    label: '3 février',
+    total: '−55,99 €',
+    items: [
+      { jour:'03', mois:'fév', nom:'Spotify Premium', sub:'Prélèvement auto', cat:'loisirs', compte:'BNP Courant', amt:'−10,99 €', type:'exp', icon:'🎵' },
+      { jour:'03', mois:'fév', nom:'Netflix', sub:'Prélèvement auto', cat:'loisirs', compte:'BNP Courant', amt:'−13,49 €', type:'exp', icon:'📺' },
+      { jour:'03', mois:'fév', nom:'Free Mobile', sub:'Prélèvement auto', cat:'divers', compte:'BNP Courant', amt:'−19,99 €', type:'exp', icon:'📱' },
+      { jour:'03', mois:'fév', nom:'Boulangerie Paul', sub:'CB · 08:14', cat:'alim', compte:'BNP Courant', amt:'−11,52 €', type:'exp', icon:'🥐' },
+    ]
+  },
+  {
+    label: '2 février',
+    total: '−345,00 €',
+    items: [
+      { jour:'02', mois:'fév', nom:'Virement PEA Boursorama', sub:'Virement SEPA', cat:'invest', compte:'BNP → PEA', amt:'−300,00 €', type:'exp', icon:'📊' },
+      { jour:'02', mois:'fév', nom:'SNCF Connect', sub:'CB · 18:03', cat:'transport', compte:'BNP Courant', amt:'−45,00 €', type:'exp', icon:'🚄' },
+    ]
+  },
+];
+
+const catFiltres = [
+  { nom:'Alimentation', color:'var(--amber)', count:42 },
+  { nom:'Logement', color:'var(--red)', count:3 },
+  { nom:'Loisirs', color:'var(--purple)', count:18 },
+  { nom:'Transport', color:'var(--blue)', count:14 },
+  { nom:'Investissement', color:'var(--cyan)', count:6 },
+  { nom:'Santé', color:'var(--pink)', count:7 },
+  { nom:'Salaire', color:'var(--green)', count:2 },
+  { nom:'Divers', color:'var(--text-2)', count:55 },
+];
+
+const histoData = [4, 8, 12, 18, 24, 22, 16, 12, 10, 7, 5, 3, 2, 1, 1];
+
+// ─── RENDU ─── 
+function renderTx() {
+  const container = document.getElementById('txContainer');
+  container.innerHTML = transactionsGroupes.map(groupe => `
+    <div class="tx-group-label">
+      <span>${groupe.label}</span>
+      <span class="group-total">${groupe.total}</span>
+    </div>
+    ${groupe.items.map(t => {
+      const cat = categories[t.cat];
+      return `
+        <div class="tx-row">
+          <div class="tx-date-col">
+            <span class="day">${t.jour}</span>
+            ${t.mois}
+          </div>
+          <div class="tx-main-col">
+            <div class="tx-icon" style="background:${cat.bg}">${t.icon}</div>
+            <div class="tx-text">
+              <div class="tx-name">${t.nom}</div>
+              <div class="tx-sub">${t.sub}</div>
+            </div>
+          </div>
+          <div>
+            <span class="tx-cat-tag" style="background:${cat.bg};color:${cat.color}">
+              <span class="cat-dot" style="background:${cat.color}"></span>
+              ${cat.nom}
+            </span>
+          </div>
+          <div class="tx-acct-col">${t.compte}</div>
+          <div class="tx-amt-col ${t.type}">${t.amt}</div>
+          <div class="tx-menu-col">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `).join('');
+}
+
+function renderCatList() {
+  document.getElementById('catList').innerHTML = catFiltres.map(c => `
+    <div class="cat-item">
+      <div class="cat-dot-lg" style="background:${c.color}"></div>
+      <span class="cat-name">${c.nom}</span>
+      <span class="cat-count">${c.count}</span>
+    </div>
+  `).join('');
+}
+
+function renderHisto() {
+  const max = Math.max(...histoData);
+  document.getElementById('histo').innerHTML = histoData.map((v, i) => {
+    const h = (v/max)*100;
+    const isActive = i < 10;
+    return `<div class="histo-bar ${isActive?'active':''}" style="height:${h}%"></div>`;
+  }).join('');
+}
+
+renderTx();
+renderCatList();
+renderHisto();
+
+// Toggle type switch
+document.querySelectorAll('.type-switch button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.type-switch button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

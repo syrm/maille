@@ -1,0 +1,15 @@
+{
+  "name": "maille",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "rescript && vite build",
+    "res:build": "rescript",
+    "res:watch": "rescript watch",
+    "dev": "vite"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "rescript": "^12.0.0",
+    "vite": "^5.0.0"
+  }
+}

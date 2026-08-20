@@ -1,0 +1,7 @@
+export { barChart }  from './bar'
+export { lineChart } from './line'
+export { pieChart }  from './pie'
+export { PALETTE }   from './core'
+export type { BarSeries, BarChartOptions }   from './bar'
+export type { LineSeries, LineChartOptions } from './line'
+export type { PieSlice, PieChartOptions }    from './pie'

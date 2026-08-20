@@ -1,0 +1,102 @@
+{{ extends "layout.jet" }}
+
+{{ block body() }}
+<div class="header anim d1">
+  <div><h1>Tableau de bord</h1>
+    <p>Dernière mise à jour : 6 février 2026, 14:32</p></div>
+  <div class="header-actions">
+    <div class="period-sel">
+      <button class="period-btn">7J</button>
+      <button class="period-btn active">1M</button>
+      <button class="period-btn">3M</button>
+      <button class="period-btn">1A</button>
+      <button class="period-btn">Max</button>
+    </div>
+    <button class="btn-icon" title="Exporter">
+      <svg fill="none" height="15" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="15">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" x2="12" y1="15" y2="3"></line>
+      </svg>
+    </button>
+  </div>
+</div>
+<div class="balance-row anim d2">
+  <div class="card bal-card main-bal">
+    <div class="bal-label"><span class="dot" style="background:var(--green)"></span> Solde global</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.TotalBalance, lang, 0) }}</div>
+    <span class="badge up">↑ ? % ce mois</span></div>
+  <div class="card bal-card">
+    <div class="bal-label"><span class="dot" style="background:var(--blue)"></span> Comptes courants</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.CheckingBalance, lang, 0) }}</div>
+    <span class="badge up">↑ ? €</span></div>
+  <div class="card bal-card">
+    <div class="bal-label"><span class="dot" style="background:var(--purple)"></span> Épargne</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.SavingsBalance, lang, 0) }}</div>
+    <span class="badge up">↑ ? %</span></div>
+  <div class="card bal-card">
+    <div class="bal-label"><span class="dot" style="background:var(--amber)"></span> Investissements</div>
+    <div class="bal-value">{{ formatMoney(balanceSummary.InvestmentBalance, lang, 0) }}</div>
+    <span class="badge down">↓ ? %</span></div>
+</div>
+
+<div class="row-2 anim d3">
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Évolution du patrimoine</div>
+        <div class="card-sub">Solde global sur 12 mois</div>
+      </div>
+      <div class="legend-row" style="margin:0">
+        <div class="legend-tag"><span style="background:var(--green)"></span> Total</div>
+        <div class="legend-tag"><span style="background:var(--blue)"></span> Épargne</div>
+        <div class="legend-tag"><span style="background:var(--amber)"></span> Invest.</div>
+      </div>
+    </div>
+    <div class="chart-wrap" id="net-worth-history-chart"></div>
+    <script type="application/json" id="app-data-net-worth-history">
+      {{ raw(json(netWorthHistory)) }}
+    </script>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Répartition par catégorie</div>
+        <div class="card-sub">Poids de chaque poche</div>
+      </div>
+    </div>
+    <div class="donut-wrap" id="breakdown-category-chart"></div>
+    <div class="donut-legend">asrendarsend rsaend rasden rased</div>
+    <script type="application/json" id="app-data-breakdown-category">
+      {{ raw(json(breakdownCategory)) }}
+    </script>
+  </div>
+</div>
+
+<div class="row-3 anim d4">
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Transactions récentes</div>
+      <div class="card-sub">Dernières opérations</div>
+    </div>
+  </div>
+  <div id="txList">
+    {{ range id, transaction := recentTransactions }}
+    <div class="tx-item">
+      <div class="tx-icon" style="background:{{ transaction.Color }}">{{ transaction.Icon }}</div>
+      <div>
+        <div class="tx-name">{{ transaction.Payee }}</div>
+        <div class="tx-cat">{{ transaction.Alias }}</div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amt {{ if transaction.Amount.IsPositive() }}inc{{ else }}exp{{ end }}">{{ formatMoney(transaction.Amount, lang, 2) }}</div>
+        <div class="tx-date">{{ shortDate(transaction.Date, lang) }}</div>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+</div>
+</div>
+{{ end }}

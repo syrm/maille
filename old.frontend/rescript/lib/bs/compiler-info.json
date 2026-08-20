@@ -1,0 +1,8 @@
+{
+  "version": "12.2.0",
+  "bsc_path": "/mnt/data/src/go/maille/frontend/rescript/node_modules/@rescript/linux-x64/bin/bsc.exe",
+  "bsc_hash": "ca03c46847ff55e2a2115049975f546b655fceff6fc10e34645da2e812314070",
+  "rescript_config_hash": "eeebead9c5c58659e092c5d4a77fd4538d58e4b6de9793597cc1bb3a97d23984",
+  "runtime_path": "/mnt/data/src/go/maille/frontend/rescript/node_modules/@rescript/runtime",
+  "generated_at": "1776013321180"
+}
